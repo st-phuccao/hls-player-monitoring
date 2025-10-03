@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description"
+        content="HLS Stream Monitor - Professional tool for load testing and monitoring HLS streams">
+    <meta name="keywords" content="HLS, streaming, monitor, load testing, video">
+    <meta name="author" content="Ott-clouds">
+
+    <title>HLS Player</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/webp" href="favicon.webp">
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- External Dependencies -->
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- hls.js for HLS playback -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <!-- Header Section -->
+    <header class="header">
+        <div class="container">
+            <h1 class="header__title">
+                <img src="logo-white.svg" alt="HLS Stream Monitor Logo" class="header__logo">
+
+            </h1>
+            <div class="header__status">
+                <span class="status-indicator" id="connectionStatus">
+                    <i class="fas fa-circle"></i>
+                    Ready
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Stream URL Input Section -->
+            <section class="stream-input">
+                <div class="input-group">
+                    <label for="streamUrl" class="input-group__label">
+                        <i class="fas fa-link"></i>
+                        HLS Stream URL
+                    </label>
+                    <div class="input-group__wrapper">
+                        <input type="url" id="streamUrl" class="input-group__input"
+                            placeholder="https://example.com/stream/playlist.m3u8" aria-describedby="urlHelp"
+                            value="https://s2.phim1280.tv/20230919/sqojVKXO/2000kb/hls/index.m3u8">
+                        <button type="button" id="loadStream" class="btn btn--primary">
+                            <i class="fas fa-play"></i>
+                            Load Stream
+                            <span class="keyboard-hint">R</span>
+                        </button>
+                    </div>
+                    <small id="urlHelp" class="input-group__help">
+                        Enter a valid HLS stream URL ending with .m3u8 (e.g., playlist.m3u8, index.m3u8)
+                    </small>
+                    <div id="urlError" class="input-group__error" role="alert" aria-live="polite"></div>
+
+                    <!-- Progress indicator for stream loading -->
+                    <div id="loadingProgress" class="progress-bar" style="display: none;">
+                        <div class="progress-bar__fill" id="loadingProgressFill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Video Player Section -->
+            <section class="video-section">
+                <div class="video-container">
+                    <video id="videoPlayer" class="video-player" preload="metadata" crossorigin="anonymous" playsinline
+                        muted aria-label="HLS Video Player" tabindex="0">
+                        Your browser does not support the video tag or HLS streaming.
+                    </video>
+
+                    <!-- Keyboard shortcuts help -->
+                    <div class="sr-only" id="video-shortcuts-help">
+                        Keyboard shortcuts: Space to play/pause, F for fullscreen, M to mute, Arrow up/down for volume,
+                        R to reload stream, Escape to exit fullscreen
+                    </div>
+
+                    <!-- Custom Controls Overlay -->
+                    <div class="video-controls-overlay">
+                        <!-- Live Indicator -->
+                        <div id="liveIndicator" class="live-indicator" style="display: none;">
+                            <i class="fas fa-circle"></i>
+                            LIVE
+                        </div>
+
+                        <!-- Control Buttons -->
+                        <div class="control-buttons">
+                            <button id="playPauseBtn" class="control-btn" title="Play/Pause">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button id="muteBtn" class="control-btn" title="Mute/Unmute">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                            <button id="stopBtn" class="control-btn" title="Stop">
+                                <i class="fas fa-stop"></i>
+                            </button>
+                            <button id="fullscreenBtn" class="control-btn" title="Fullscreen">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loading Indicator -->
+                    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Loading stream...
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analytics Dashboard -->
+            <section class="dashboard">
+                <div class="dashboard__grid">
+                    <!-- User Information Card -->
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">
+                                <i class="fas fa-user"></i>
+                                User Information
+                            </h2>
+                        </header>
+                        <div class="card__content">
+                            <div class="info-grid" id="userInfo">
+                                <!-- User info will be populated by JavaScript -->
+                                <div class="info-item">
+                                    <span class="info-item__label">Browser:</span>
+                                    <span class="info-item__value" id="browserInfo">Loading...</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">OS:</span>
+                                    <span class="info-item__value" id="osInfo">Loading...</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Screen:</span>
+                                    <span class="info-item__value" id="screenInfo">Loading...</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Connection:</span>
+                                    <span class="info-item__value" id="connectionInfo">Loading...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Stream Performance Card -->
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">
+                                <i class="fas fa-chart-line"></i>
+                                Stream Performance
+                            </h2>
+                        </header>
+                        <div class="card__content">
+                            <div class="info-grid" id="streamInfo">
+                                <div class="info-item">
+                                    <span class="info-item__label">Bitrate:</span>
+                                    <span class="info-item__value" id="bitrateInfo">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Resolution:</span>
+                                    <span class="info-item__value" id="resolutionInfo">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Frame Rate:</span>
+                                    <span class="info-item__value" id="frameRateInfo">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Load Time:</span>
+                                    <span class="info-item__value" id="loadTimeInfo">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Network Metrics Card -->
+                    <article class="card">
+                        <header class="card__header">
+                            <h2 class="card__title">
+                                <i class="fas fa-wifi"></i>
+                                Network Metrics
+                            </h2>
+                        </header>
+                        <div class="card__content">
+                            <div class="chart-container">
+                                <canvas id="networkChart" aria-label="Network performance chart"></canvas>
+                            </div>
+                        </div>
+                    </article>
+
+
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Keyboard Shortcuts Help -->
+    <div id="keyboardHelp" class="keyboard-help" style="display: none;" role="dialog"
+        aria-labelledby="keyboard-help-title" aria-modal="true">
+        <div class="keyboard-help__content">
+            <h3 id="keyboard-help-title">Keyboard Shortcuts</h3>
+            <div class="keyboard-help__shortcuts">
+                <div class="shortcut-item">
+                    <kbd>Space</kbd>
+                    <span>Play/Pause video</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>F</kbd>
+                    <span>Toggle fullscreen</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>M</kbd>
+                    <span>Mute/Unmute</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>↑</kbd>
+                    <span>Volume up</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>↓</kbd>
+                    <span>Volume down</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>R</kbd>
+                    <span>Reload stream</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>Esc</kbd>
+                    <span>Exit fullscreen</span>
+                </div>
+                <div class="shortcut-item">
+                    <kbd>?</kbd>
+                    <span>Show/hide this help</span>
+                </div>
+            </div>
+            <button type="button" class="btn btn--primary" onclick="toggleKeyboardHelp()">
+                <i class="fas fa-times"></i>
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p class="footer__text">
+                <i class="fas fa-code"></i>
+                HLS Stream Monitor - Professional Load Testing Tool
+                <button type="button" class="keyboard-help-trigger" onclick="toggleKeyboardHelp()"
+                    title="Show keyboard shortcuts">
+                    <i class="fas fa-keyboard"></i>
+                    <span class="keyboard-hint">?</span>
+                </button>
+            </p>
+        </div>
+    </footer>
+
+    <!-- Main Application JavaScript -->
+    <script type="module" src="app.js"></script>
+
+    <!-- Debug Tools for Data Consumption -->
+    <script src="debug-data-consumption.js"></script>
+
+</body>
+
+</html>

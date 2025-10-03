@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Data Consumption Tracker V2</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: #f8fafc;
+            padding: 20px;
+        }
+
+        .test-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .test-button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .test-button:hover {
+            background: #1d4ed8;
+        }
+
+        .test-result {
+            background: #1e293b;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #2563eb;
+        }
+
+        .warning {
+            border-left-color: #f59e0b;
+        }
+
+        .success {
+            border-left-color: #10b981;
+        }
+
+        .error {
+            border-left-color: #ef4444;
+        }
+
+        pre {
+            background: #334155;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+
+        .step {
+            background: #334155;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            border-left: 3px solid #64748b;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="test-container">
+        <h1>🧪 Test Data Consumption Tracker V2</h1>
+
+        <div class="test-result success">
+            <h3>✅ Các cải tiến đã thực hiện:</h3>
+            <ul>
+                <li>✅ Tạo panel ngay khi khởi tạo (không cần đợi data)</li>
+                <li>✅ Thêm network interception để track tất cả HTTP requests</li>
+                <li>✅ Thêm nhiều HLS event listeners</li>
+                <li>✅ Thêm video element tracking cho buffer monitoring</li>
+                <li>✅ Cải thiện debug logging và error handling</li>
+                <li>✅ Thêm comprehensive debug tools</li>
+            </ul>
+        </div>
+
+        <div class="test-result">
+            <h3>🔧 Hướng dẫn test chi tiết:</h3>
+
+            <div class="step">
+                <strong>Bước 1:</strong> Mở trang chính (index.html) trong tab mới
+            </div>
+
+            <div class="step">
+                <strong>Bước 2:</strong> Mở Developer Console (F12)
+            </div>
+
+            <div class="step">
+                <strong>Bước 3:</strong> Chạy debug command chính:
+                <pre><code>debugDataConsumptionDetailed()</code></pre>
+                Command này sẽ kiểm tra tất cả các thành phần và hiển thị trạng thái chi tiết
+            </div>
+        </div>
+
+        <div class="test-result">
+            <h3>🔍 Debug Commands Mới (chạy trong console):</h3>
+
+            <h4>1. 🎯 Debug chi tiết (RECOMMENDED - chạy đầu tiên):</h4>
+            <pre><code>debugDataConsumptionDetailed()</code></pre>
+            <p>Kiểm tra toàn bộ hệ thống, tạo panel nếu chưa có, test simulation</p>
+
+            <h4>2. 🧪 Test tất cả methods tracking:</h4>
+            <pre><code>testAllDataTracking()</code></pre>
+            <p>Test tất cả các cách track data khác nhau</p>
+
+            <h4>3. 📊 Monitor real-time:</h4>
+            <pre><code>const monitor = startDataConsumptionMonitoring(3000)
+// Để dừng: clearInterval(monitor)</code></pre>
+            <p>Monitor data consumption mỗi 3 giây</p>
+
+            <h4>4. 🎬 Test với stream thật:</h4>
+            <pre><code>testWithRealStream()</code></pre>
+            <p>Load stream và monitor data trong 30 giây</p>
+
+            <h4>5. 🔄 Debug commands cũ (vẫn hoạt động):</h4>
+            <pre><code>debugDataConsumption()        // Thông tin cơ bản
+simulateDataLoading()         // Mô phỏng 2MB data
+forceDataUpdate()            // Force update UI</code></pre>
+        </div>
+
+        <div class="test-result warning">
+            <h3>⚠️ Vấn đề hiện tại và cách khắc phục:</h3>
+
+            <h4>Vấn đề: Data consumption thấp (chỉ ~112KB)</h4>
+            <p><strong>Nguyên nhân có thể:</strong></p>
+            <ul>
+                <li>HLS.js events không trigger đủ data</li>
+                <li>Network interception chưa hoạt động đúng</li>
+                <li>Video segments không được track</li>
+            </ul>
+
+            <p><strong>Cách test:</strong></p>
+            <ol>
+                <li>Chạy <code>debugDataConsumptionDetailed()</code> để xem trạng thái</li>
+                <li>Load một stream và play video</li>
+                <li>Chạy <code>testWithRealStream()</code> để monitor</li>
+                <li>Kiểm tra Network tab trong DevTools để xem requests</li>
+            </ol>
+        </div>
+
+        <div class="test-result">
+            <h3>🎯 Kết quả mong đợi sau khi sửa:</h3>
+            <ul>
+                <li>✅ Panel "Data Consumption & Transfer" xuất hiện ngay</li>
+                <li>✅ Status: "Waiting for stream..." → "Ready" → "Active"</li>
+                <li>✅ Total Data Loaded tăng khi play video (MB/GB level)</li>
+                <li>✅ Data Rate hiển thị tốc độ transfer real-time</li>
+                <li>✅ Data Efficiency tính MB/phút chính xác</li>
+                <li>✅ Console logs hiển thị fragment loading</li>
+            </ul>
+        </div>
+
+        <div class="test-result error">
+            <h3>🐛 Troubleshooting Steps:</h3>
+
+            <h4>Nếu panel không xuất hiện:</h4>
+            <pre><code>// Force tạo panel
+if (dataConsumptionTracker) {
+    dataConsumptionTracker.createDataPanel();
+    dataConsumptionTracker.updateDataDisplay();
+}</code></pre>
+
+            <h4>Nếu data không tăng khi play video:</h4>
+            <pre><code>// Kiểm tra HLS events
+if (hlsPlayer) {
+    console.log('HLS levels:', hlsPlayer.levels);
+    console.log('Current level:', hlsPlayer.currentLevel);
+}
+
+// Kiểm tra network requests trong DevTools Network tab
+// Tìm các requests .ts, .m3u8, .mp4</code></pre>
+
+            <h4>Nếu vẫn không hoạt động:</h4>
+            <ol>
+                <li>Refresh trang và thử lại</li>
+                <li>Kiểm tra console có errors không</li>
+                <li>Test với stream URL khác</li>
+                <li>Chạy <code>simulateDataLoading()</code> để test UI</li>
+            </ol>
+        </div>
+
+        <div class="test-result success">
+            <h3>📈 Test với stream thật:</h3>
+            <ol>
+                <li>Paste URL stream vào input field</li>
+                <li>Click "Load Stream"</li>
+                <li>Click play button</li>
+                <li>Chạy <code>startDataConsumptionMonitoring(2000)</code></li>
+                <li>Quan sát data tăng trong console và dashboard</li>
+                <li>Kiểm tra Network tab để xem HTTP requests</li>
+            </ol>
+
+            <p><strong>Stream test URLs:</strong></p>
+            <pre><code>https://s2.phim1280.tv/20230919/sqojVKXO/2000kb/hls/index.m3u8
+https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8</code></pre>
+        </div>
+    </div>
+</body>
+
+</html>
