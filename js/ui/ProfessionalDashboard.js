@@ -82,16 +82,6 @@ class ProfessionalDashboard {
                     <i class="fas fa-chart-line"></i>
                     Stream Performance Metrics
                 </h2>
-                <div class="dashboard-controls">
-                    <button class="btn btn--secondary" id="exportMetrics" title="Export Metrics">
-                        <i class="fas fa-download"></i>
-                        Export
-                    </button>
-                    <button class="btn btn--secondary" id="resetMetrics" title="Reset All Metrics">
-                        <i class="fas fa-refresh"></i>
-                        Reset
-                    </button>
-                </div>
             `;
 
             // Insert header at the beginning of dashboard
@@ -197,48 +187,14 @@ class ProfessionalDashboard {
      */
     addEventListeners() {
         try {
-            const exportBtn = document.getElementById('exportMetrics');
-            const resetBtn = document.getElementById('resetMetrics');
-
-            if (exportBtn) {
-                exportBtn.addEventListener('click', () => {
-                    this.exportMetrics();
-                });
-            }
-
-            if (resetBtn) {
-                resetBtn.addEventListener('click', () => {
-                    this.resetMetrics();
-                });
-            }
+            // Event listeners can be added here for future dashboard controls
 
         } catch (error) {
             console.error('Error adding event listeners:', error);
         }
     }
 
-    /**
-     * Export current metrics
-     */
-    exportMetrics() {
-        try {
-            const metrics = this.collectCurrentMetrics();
-            const dataStr = JSON.stringify(metrics, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
 
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(dataBlob);
-            link.download = `hls-metrics-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-            console.log('Metrics exported successfully');
-        } catch (error) {
-            console.error('Error exporting metrics:', error);
-        }
-    }
 
     /**
      * Reset all metrics
@@ -267,30 +223,7 @@ class ProfessionalDashboard {
         }
     }
 
-    /**
-     * Collect current metrics from dashboard
-     */
-    collectCurrentMetrics() {
-        try {
-            const metrics = {
-                timestamp: new Date().toISOString(),
-                data: {}
-            };
 
-            // Collect all metric values
-            const metricValues = document.querySelectorAll('.info-item__value, .metric-item__value');
-            metricValues.forEach(value => {
-                if (value.id) {
-                    metrics.data[value.id] = value.textContent.trim();
-                }
-            });
-
-            return metrics;
-        } catch (error) {
-            console.error('Error collecting metrics:', error);
-            return { timestamp: new Date().toISOString(), data: {} };
-        }
-    }
 
     /**
      * Update metric with professional styling
@@ -362,12 +295,7 @@ class ProfessionalDashboard {
     cleanup() {
         try {
             // Remove event listeners
-            const exportBtn = document.getElementById('exportMetrics');
             const resetBtn = document.getElementById('resetMetrics');
-
-            if (exportBtn) {
-                exportBtn.removeEventListener('click', this.exportMetrics);
-            }
 
             if (resetBtn) {
                 resetBtn.removeEventListener('click', this.resetMetrics);

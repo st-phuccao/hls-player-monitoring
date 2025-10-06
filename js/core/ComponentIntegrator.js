@@ -11,18 +11,11 @@ export function integrateTrackingComponents(eventType, components) {
     try {
         console.log(`Integrating tracking components for event: ${eventType}`);
 
-        const { hlsPlayer, bitrateMonitor, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream } = components;
+        const { hlsPlayer, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream } = components;
 
         // Ensure all trackers are properly connected to HLS instance
         if (hlsPlayer) {
-            // Connect bitrate monitor to HLS instance
-            if (bitrateMonitor && typeof bitrateMonitor.setHLSInstance === 'function') {
-                try {
-                    bitrateMonitor.setHLSInstance(hlsPlayer);
-                } catch (error) {
-                    console.warn('Failed to connect bitrate monitor to HLS instance:', error);
-                }
-            }
+
 
             // Connect error tracker to HLS instance
             if (errorTracker && typeof errorTracker.setHLSInstance === 'function') {
@@ -258,7 +251,6 @@ export function integrateAllComponents(components, showGlobalMessage, showGlobal
 
         const {
             performanceTracker,
-            bitrateMonitor,
             errorTracker,
             dataConsumptionTracker,
             metricsDataManager,
@@ -269,7 +261,6 @@ export function integrateAllComponents(components, showGlobalMessage, showGlobal
         // Verify all core components are initialized
         const componentList = {
             performanceTracker,
-            bitrateMonitor,
             errorTracker,
             dataConsumptionTracker,
             metricsDataManager,
@@ -292,15 +283,7 @@ export function integrateAllComponents(components, showGlobalMessage, showGlobal
         if (hlsPlayer) {
             console.log('Connecting HLS instance to trackers...');
 
-            // Connect bitrate monitor
-            if (bitrateMonitor && typeof bitrateMonitor.setHLSInstance === 'function') {
-                try {
-                    bitrateMonitor.setHLSInstance(hlsPlayer);
-                    console.log('Bitrate monitor connected to HLS instance');
-                } catch (error) {
-                    console.error('Failed to connect bitrate monitor:', error);
-                }
-            }
+
 
             // Connect error tracker
             if (errorTracker && typeof errorTracker.setHLSInstance === 'function') {
@@ -335,7 +318,6 @@ export function integrateAllComponents(components, showGlobalMessage, showGlobal
             try {
                 metricsDataManager.initialize({
                     performanceTracker,
-                    bitrateMonitor,
                     errorTracker,
                     dataConsumptionTracker
                 });
@@ -445,43 +427,7 @@ function testIntegrationWithNetworkConditions() {
     }
 }
 
-/**
- * Create fallback bitrate monitor for graceful degradation
- */
-export function createFallbackBitrateMonitor() {
-    return {
-        metrics: {
-            current_bitrate: 0,
-            avg_bitrate_played: 0,
-            current_bandwidth: 0,
-            bitrate_history: []
-        },
 
-        setHLSInstance: function (hls) {
-            console.log('Fallback bitrate monitor: HLS instance set (limited functionality)');
-        },
-
-        getBitrateMetrics: function () {
-            return { ...this.metrics };
-        },
-
-        getCurrentBitrate: function () {
-            return this.metrics.current_bitrate;
-        },
-
-        getAverageBitrate: function () {
-            return this.metrics.avg_bitrate_played;
-        },
-
-        getCurrentBandwidth: function () {
-            return this.metrics.current_bandwidth;
-        },
-
-        cleanup: function () {
-            console.log('Fallback bitrate monitor cleanup');
-        }
-    };
-}
 
 /**
  * Create fallback error tracker for graceful degradation

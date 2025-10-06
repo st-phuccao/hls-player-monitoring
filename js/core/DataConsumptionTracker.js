@@ -11,7 +11,8 @@ export default class DataConsumptionTracker {
             session_start_time: null,
             last_update_time: null,
             data_history: [],
-            transfer_rates: []
+            transfer_rates: [],
+            total_requests: 0 // Track total network requests
         };
 
         this.hlsInstance = null;
@@ -193,31 +194,37 @@ export default class DataConsumptionTracker {
 
             // Track completed fragment loads for accurate data measurement
             this.hlsInstance.on(window.Hls.Events.FRAG_LOADED, (event, data) => {
+                this.incrementTotalRequests(); // Count fragment requests
                 this.handleFragmentLoaded(event, data);
             });
 
             // Track manifest loading for complete data consumption
             this.hlsInstance.on(window.Hls.Events.MANIFEST_LOADED, (event, data) => {
+                this.incrementTotalRequests(); // Count manifest requests
                 this.handleManifestLoaded(event, data);
             });
 
             // Track level loading for playlist data
             this.hlsInstance.on(window.Hls.Events.LEVEL_LOADED, (event, data) => {
+                this.incrementTotalRequests(); // Count level requests
                 this.handleLevelLoaded(event, data);
             });
 
             // Track audio fragment loading
             this.hlsInstance.on(window.Hls.Events.AUDIO_TRACK_LOADED, (event, data) => {
+                this.incrementTotalRequests(); // Count audio track requests
                 this.handleAudioTrackLoaded(event, data);
             });
 
             // Track subtitle loading
             this.hlsInstance.on(window.Hls.Events.SUBTITLE_TRACK_LOADED, (event, data) => {
+                this.incrementTotalRequests(); // Count subtitle requests
                 this.handleSubtitleTrackLoaded(event, data);
             });
 
             // Track key loading (for encrypted streams)
             this.hlsInstance.on(window.Hls.Events.KEY_LOADED, (event, data) => {
+                this.incrementTotalRequests(); // Count key requests
                 this.handleKeyLoaded(event, data);
             });
 
@@ -226,8 +233,8 @@ export default class DataConsumptionTracker {
                 this.handleFragmentParsingData(event, data);
             });
 
-            // Add network monitoring through XMLHttpRequest interception
-            this.setupNetworkInterception();
+            // Network interception disabled to avoid double counting with HLS events
+            // this.setupNetworkInterception();
 
             console.log('HLS data consumption event listeners setup complete');
         } catch (error) {
@@ -433,6 +440,28 @@ export default class DataConsumptionTracker {
     }
 
     /**
+     * Increment total requests counter
+     */
+    incrementTotalRequests() {
+        try {
+            if (typeof this.metrics.total_requests !== 'number') {
+                this.metrics.total_requests = 0;
+            }
+            this.metrics.total_requests++;
+        } catch (error) {
+            console.error('Error incrementing total requests:', error);
+            this.metrics.total_requests = 1; // Fallback
+        }
+    }
+
+    /**
+     * Get total requests count
+     */
+    getTotalRequests() {
+        return this.metrics.total_requests || 0;
+    }
+
+    /**
      * Update transfer rate tracking
      */
     updateTransferRate(rateMBps) {
@@ -489,8 +518,8 @@ export default class DataConsumptionTracker {
         try {
             if (this.performanceTracker) {
                 const playbackMetrics = this.performanceTracker.getPlaybackMetrics();
-                if (playbackMetrics && playbackMetrics.total_playback_time > 0) {
-                    const playbackMinutes = playbackMetrics.total_playback_time / 60; // Convert to minutes
+                if (playbackMetrics && playbackMetrics.watch_time > 0) {
+                    const playbackMinutes = playbackMetrics.watch_time / 60; // Convert to minutes
                     const totalMB = this.metrics.bytes_loaded / (1024 * 1024);
                     this.metrics.data_efficiency = totalMB / playbackMinutes; // MB per minute
                 }
@@ -724,8 +753,15 @@ export default class DataConsumptionTracker {
                 </div>
             `;
 
-            // Insert after existing panels
-            dashboardGrid.appendChild(dataPanel);
+            // Insert after Error Tracking card (position 5)
+            const errorCard = document.getElementById('errorMetricsPanel');
+            if (errorCard && errorCard.nextSibling) {
+                dashboardGrid.insertBefore(dataPanel, errorCard.nextSibling);
+            } else if (errorCard) {
+                dashboardGrid.insertBefore(dataPanel, errorCard.nextSibling);
+            } else {
+                dashboardGrid.appendChild(dataPanel);
+            }
 
             console.log('Data consumption metrics panel created');
         } catch (error) {
@@ -748,7 +784,8 @@ export default class DataConsumptionTracker {
                 session_start_time: null,
                 last_update_time: null,
                 data_history: [],
-                transfer_rates: []
+                transfer_rates: [],
+                total_requests: 0
             };
 
             this.lastFragmentTime = null;
@@ -766,6 +803,7 @@ export default class DataConsumptionTracker {
      */
     setupNetworkInterception() {
         try {
+            console.log('Setting up network interception...');
             // Store original XMLHttpRequest
             const originalXHR = window.XMLHttpRequest;
             const self = this;
@@ -788,18 +826,25 @@ export default class DataConsumptionTracker {
                 // Override send to track timing
                 xhr.send = function (...args) {
                     startTime = performance.now();
+                    console.log(`XHR Request initiated: ${requestUrl}`);
                     return originalSend.apply(this, args);
                 };
 
                 // Track response data
                 xhr.addEventListener('loadend', function () {
                     try {
+                        // Count ALL HLS requests regardless of status
+                        if (requestUrl && (requestUrl.includes('.m3u8') || requestUrl.includes('.ts') || requestUrl.includes('.mp4'))) {
+                            self.incrementTotalRequests();
+                            console.log(`Request counted: ${requestUrl.split('/').pop()} - Status: ${xhr.status}`);
+                        }
+
+                        // Only track data for successful requests
                         if (xhr.status >= 200 && xhr.status < 300) {
                             const responseSize = xhr.response ? xhr.response.byteLength || xhr.responseText?.length || 0 : 0;
                             const endTime = performance.now();
                             const loadTime = (endTime - startTime) / 1000; // seconds
 
-                            // Only track HLS-related requests
                             if (requestUrl && (requestUrl.includes('.m3u8') || requestUrl.includes('.ts') || requestUrl.includes('.mp4'))) {
                                 if (responseSize > 0) {
                                     self.addDataLoaded(responseSize);
@@ -826,24 +871,30 @@ export default class DataConsumptionTracker {
             const originalFetch = window.fetch;
             window.fetch = function (url, options = {}) {
                 const startTime = performance.now();
+                console.log(`Fetch Request initiated: ${url}`);
 
                 return originalFetch(url, options).then(response => {
                     try {
-                        if (response.ok && (url.includes('.m3u8') || url.includes('.ts') || url.includes('.mp4'))) {
-                            const contentLength = response.headers.get('content-length');
-                            if (contentLength) {
-                                const responseSize = parseInt(contentLength);
-                                const endTime = performance.now();
-                                const loadTime = (endTime - startTime) / 1000;
+                        if (url.includes('.m3u8') || url.includes('.ts') || url.includes('.mp4')) {
+                            // Increment total requests for all HLS requests
+                            self.incrementTotalRequests();
 
-                                self.addDataLoaded(responseSize);
+                            if (response.ok) {
+                                const contentLength = response.headers.get('content-length');
+                                if (contentLength) {
+                                    const responseSize = parseInt(contentLength);
+                                    const endTime = performance.now();
+                                    const loadTime = (endTime - startTime) / 1000;
 
-                                if (loadTime > 0) {
-                                    const transferRateMBps = (responseSize / (1024 * 1024)) / loadTime;
-                                    self.updateTransferRate(transferRateMBps);
+                                    self.addDataLoaded(responseSize);
+
+                                    if (loadTime > 0) {
+                                        const transferRateMBps = (responseSize / (1024 * 1024)) / loadTime;
+                                        self.updateTransferRate(transferRateMBps);
+                                    }
+
+                                    console.log(`Fetch request tracked: ${url.split('/').pop()} - ${(responseSize / 1024 / 1024).toFixed(2)} MB in ${loadTime.toFixed(2)}s`);
                                 }
-
-                                console.log(`Fetch request tracked: ${url.split('/').pop()} - ${(responseSize / 1024 / 1024).toFixed(2)} MB in ${loadTime.toFixed(2)}s`);
                             }
                         }
                     } catch (error) {
@@ -871,6 +922,33 @@ export default class DataConsumptionTracker {
             console.log('Simulated data loading for testing');
         } catch (error) {
             console.error('Error simulating data loading:', error);
+        }
+    }
+
+    /**
+     * Reset total requests counter
+     */
+    resetTotalRequests() {
+        try {
+            this.metrics.total_requests = 0;
+            console.log('Total requests counter reset');
+        } catch (error) {
+            console.error('Error resetting total requests:', error);
+        }
+    }
+
+    /**
+     * Test method to manually increment requests (for debugging)
+     */
+    testIncrementRequests(count = 5) {
+        try {
+            console.log(`Manually incrementing ${count} requests for testing...`);
+            for (let i = 0; i < count; i++) {
+                this.incrementTotalRequests();
+            }
+            console.log(`Total requests after test: ${this.getTotalRequests()}`);
+        } catch (error) {
+            console.error('Error testing request increment:', error);
         }
     }
 

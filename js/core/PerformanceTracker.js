@@ -26,6 +26,23 @@ export default class PerformanceTracker {
                 watch_time_accumulated: 0, // Tích lũy watch time khi pause/visibility change
                 last_watch_time_checkpoint: null
             },
+            bitrate: {
+                current_bitrate: 0,
+                average_bitrate: 0,
+                max_bitrate: 0,
+                bitrate_history: [],
+                bitrate_sum: 0,
+                bitrate_count: 0
+            },
+            bandwidth: {
+                current_bandwidth: 0,
+                bandwidth_history: [],
+                last_bandwidth_update: null
+            },
+            buffer: {
+                buffer_length: 0,
+                last_buffer_update: null
+            },
 
             frames: {
                 dropped_frames: 0,
@@ -42,7 +59,8 @@ export default class PerformanceTracker {
                 fps_samples: [],
                 last_frame_time: null,
                 frame_count: 0,
-                measurement_start_time: null
+                measurement_start_time: null,
+                last_display_update: null
             },
             segments: {
                 max_segment_duration: 0,
@@ -58,6 +76,15 @@ export default class PerformanceTracker {
                 segment_durations: [],
                 segment_load_times: [],
                 last_segment_time: null
+            },
+            playback: {
+                watch_time: 0,
+                playback_ratio: 0,
+                is_playing: false,
+                is_paused: false,
+                is_buffering: false,
+                playback_start_time: null,
+                session_start_time: null
             }
         };
 
@@ -67,6 +94,7 @@ export default class PerformanceTracker {
         this.playbackUpdateInterval = null;
         this.frameStatsInterval = null;
         this.fpsAnimationFrame = null;
+        this.fpsVideoInterval = null;
         this.segmentUpdateInterval = null;
 
         // State tracking cho rebuffer logic chuẩn
@@ -83,7 +111,108 @@ export default class PerformanceTracker {
      */
     setVideoElement(videoElement) {
         this.videoElement = videoElement;
+
         this.setupVideoEventListeners();
+    }
+
+    /**
+     * Set HLS instance để track bitrate và bandwidth
+     */
+    setHLSInstance(hlsInstance) {
+        this.hlsInstance = hlsInstance;
+        this.setupHLSEventListeners();
+    }
+
+    /**
+     * Setup HLS event listeners để track bitrate và bandwidth
+     */
+    setupHLSEventListeners() {
+        if (!this.hlsInstance) {
+            console.warn('No HLS instance available for bitrate tracking');
+            return;
+        }
+
+        try {
+            // Check if Hls is available globally
+            if (typeof Hls === 'undefined') {
+                console.warn('Hls not available globally, using string events');
+
+                // Use string event names as fallback
+                this.hlsInstance.on('hlsLevelSwitched', (event, data) => {
+                    console.log('Level switched (string event):', data);
+                    if (data.level !== undefined && this.hlsInstance.levels && this.hlsInstance.levels[data.level]) {
+                        const level = this.hlsInstance.levels[data.level];
+                        console.log('Updating bitrate from level switch (string):', level.bitrate);
+                        this.updateBitrateMetrics(level.bitrate);
+                    }
+                });
+
+                this.hlsInstance.on('hlsFragLoaded', (event, data) => {
+                    if (data.frag && data.frag.stats) {
+                        const stats = data.frag.stats;
+                        if (stats.total && stats.loading && stats.loading.end && stats.loading.start) {
+                            const duration = (stats.loading.end - stats.loading.start) / 1000;
+                            const bytes = stats.total;
+                            const bandwidth = (bytes * 8) / duration;
+                            this.updateBandwidthMetrics(bandwidth);
+                        }
+                    }
+                });
+            } else {
+                // Use Hls.Events constants
+                this.hlsInstance.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+                    console.log('Level switched event:', data);
+                    if (data.level !== undefined && this.hlsInstance.levels && this.hlsInstance.levels[data.level]) {
+                        const level = this.hlsInstance.levels[data.level];
+                        console.log('Updating bitrate from level switch:', level.bitrate);
+                        this.updateBitrateMetrics(level.bitrate);
+                    }
+                });
+
+                // Also listen for LEVEL_LOADED to get initial bitrate
+                this.hlsInstance.on(Hls.Events.LEVEL_LOADED, (event, data) => {
+                    console.log('Level loaded event:', data);
+                    if (data.level !== undefined && this.hlsInstance.levels && this.hlsInstance.levels[data.level]) {
+                        const level = this.hlsInstance.levels[data.level];
+                        console.log('Updating bitrate from level loaded:', level.bitrate);
+                        this.updateBitrateMetrics(level.bitrate);
+                    }
+                });
+
+                this.hlsInstance.on(Hls.Events.FRAG_LOADED, (event, data) => {
+                    console.log('✅Fragment loaded event:', data);
+                    if (data.frag && data.frag.stats) {
+                        const stats = data.frag.stats;
+                        if (stats.total && stats.loading && stats.loading.end && stats.loading.start) {
+                            const duration = (stats.loading.end - stats.loading.start) / 1000;
+                            const bytes = stats.total;
+                            const bandwidth = (bytes * 8) / duration;
+                            const bandwidthMbps = Math.round(bandwidth / 1000000); // Mbps
+                            console.log('Updating bandwidth from fragment:', bandwidthMbps);
+                            // this.updateBandwidthMetrics(bandwidthMbps); //bps
+                        }
+                    }
+                });
+            }
+
+            // Also try to get current level immediately if available
+            if (this.hlsInstance.levels && this.hlsInstance.currentLevel >= 0) {
+                const currentLevel = this.hlsInstance.levels[this.hlsInstance.currentLevel];
+                if (currentLevel && currentLevel.bitrate) {
+                    console.log('Setting initial bitrate:', currentLevel.bitrate);
+                    this.updateBitrateMetrics(currentLevel.bitrate);
+                }
+            }
+
+            // Set up periodic bitrate check in case events don't fire
+            this.bitrateCheckInterval = setInterval(() => {
+                this.checkCurrentBitrate();
+            }, 5000); // Check every 5 seconds
+
+            console.log('HLS event listeners setup for bitrate/bandwidth tracking');
+        } catch (error) {
+            console.error('Error setting up HLS event listeners:', error);
+        }
     }
 
     /**
@@ -351,13 +480,17 @@ export default class PerformanceTracker {
      */
     onVisibilityChange() {
         if (document.hidden) {
-            // Tab bị ẩn - checkpoint watch time
+            // Tab bị ẩn - checkpoint watch time để preserve
             this.checkpointWatchTime();
-            console.log('Tab hidden - watch time checkpointed');
+            console.log('Tab hidden - watch time checkpointed and preserved');
         } else {
-            // Tab được focus lại - resume từ checkpoint
-            this.resumeWatchTime();
-            console.log('Tab visible - watch time resumed from checkpoint');
+            // Tab được focus lại - chỉ resume nếu video đang play
+            if (this.videoElement && !this.videoElement.paused && !this.videoElement.seeking) {
+                this.resumeWatchTime();
+                console.log('Tab visible - watch time resumed from checkpoint');
+            } else {
+                console.log('Tab visible - but video is paused/seeking, not resuming watch time');
+            }
         }
     }
 
@@ -368,8 +501,8 @@ export default class PerformanceTracker {
         if (this.metrics.rebuffering.watch_time_start) {
             const elapsed = (performance.now() - this.metrics.rebuffering.watch_time_start) / 1000;
             this.metrics.rebuffering.watch_time_accumulated += elapsed;
+            this.metrics.rebuffering.total_watch_time = this.metrics.rebuffering.watch_time_accumulated;
             this.metrics.rebuffering.watch_time_start = null;
-            console.log(`Watch time checkpointed: +${elapsed.toFixed(2)}s, total: ${this.metrics.rebuffering.watch_time_accumulated.toFixed(2)}s`);
         }
     }
 
@@ -377,21 +510,38 @@ export default class PerformanceTracker {
      * Resume watch time - tiếp tục từ checkpoint
      */
     resumeWatchTime() {
-        if (!this.videoElement || this.videoElement.paused || this.videoElement.seeking) {
+        if (!this.videoElement || this.videoElement.paused || this.videoElement.seeking || document.hidden) {
+            console.log('Cannot resume watch time:', {
+                hasVideo: !!this.videoElement,
+                paused: this.videoElement?.paused,
+                seeking: this.videoElement?.seeking,
+                hidden: document.hidden
+            });
             return;
         }
 
         this.metrics.rebuffering.watch_time_start = performance.now();
-        console.log('Watch time resumed');
+
     }
 
     /**
      * Update watch time từ timeupdate event
      */
     updateWatchTimeFromTimeUpdate() {
-        if (this.metrics.rebuffering.watch_time_start) {
+
+
+        // Chỉ update watch time nếu video đang play (không pause, không seeking)
+        if (this.metrics.rebuffering.watch_time_start &&
+            this.videoElement &&
+            !this.videoElement.paused &&
+            !this.videoElement.seeking) {
+
             const currentWatchTime = (performance.now() - this.metrics.rebuffering.watch_time_start) / 1000;
             this.metrics.rebuffering.total_watch_time = this.metrics.rebuffering.watch_time_accumulated + currentWatchTime;
+
+
+
+
 
             // Recalculate rebuffer ratio
             if (this.metrics.rebuffering.total_watch_time > 0) {
@@ -462,21 +612,21 @@ export default class PerformanceTracker {
     }
 
     /**
-     * Cập nhật hiển thị metrics startup theo thời gian thực
+     * Cập nhật hiển thị metrics startup trong overview panel
      */
     updateStartupDisplay() {
         try {
-            // Tìm hoặc tạo startup metrics panel
-            let startupPanel = document.getElementById('startupMetricsPanel');
+            // Tìm hoặc tạo overview panel
+            let overviewPanel = document.getElementById('overviewMetricsPanel');
 
-            if (!startupPanel) {
-                this.createStartupPanel();
-                startupPanel = document.getElementById('startupMetricsPanel');
+            if (!overviewPanel) {
+                this.createOverviewPanel();
+                overviewPanel = document.getElementById('overviewMetricsPanel');
             }
 
-            if (startupPanel) {
-                const startupTimeElement = startupPanel.querySelector('#startupTimeValue');
-                const statusElement = startupPanel.querySelector('#startupStatus');
+            if (overviewPanel) {
+                const startupTimeElement = overviewPanel.querySelector('#startupTimeValue');
+                const statusElement = overviewPanel.querySelector('#startupStatus');
 
                 if (this.isStartupMeasurementActive) {
                     if (statusElement) {
@@ -513,25 +663,31 @@ export default class PerformanceTracker {
     }
 
     /**
-     * Tạo startup metrics panel trong dashboard
+     * Tạo overview panel tổng hợp thay thế startup và stream performance panels
      */
-    createStartupPanel() {
+    createOverviewPanel() {
         try {
             const dashboardGrid = document.querySelector('.dashboard__grid');
             if (!dashboardGrid) {
-                console.warn('Dashboard grid not found, cannot create startup panel');
+                console.warn('Dashboard grid not found, cannot create overview panel');
                 return;
             }
 
-            const startupPanel = document.createElement('article');
-            startupPanel.className = 'card';
-            startupPanel.id = 'startupMetricsPanel';
+            // Xóa các panel cũ nếu tồn tại
+            const existingStartup = document.getElementById('startupMetricsPanel');
+            const existingRebuffer = document.getElementById('rebufferMetricsPanel');
+            if (existingStartup) existingStartup.remove();
+            if (existingRebuffer) existingRebuffer.remove();
 
-            startupPanel.innerHTML = `
+            const overviewPanel = document.createElement('article');
+            overviewPanel.className = 'card';
+            overviewPanel.id = 'overviewMetricsPanel';
+
+            overviewPanel.innerHTML = `
                 <header class="card__header">
                     <h2 class="card__title">
-                        <i class="fas fa-stopwatch"></i>
-                        Startup Performance
+                        <i class="fas fa-chart-line"></i>
+                        Performance Overview
                     </h2>
                 </header>
                 <div class="card__content">
@@ -545,20 +701,61 @@ export default class PerformanceTracker {
                             <span class="info-item__value" id="startupStatus">Ready</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-item__label">Precision:</span>
-                            <span class="info-item__value">High</span>
+                            <span class="info-item__label">Current Bitrate:</span>
+                            <span class="info-item__value" id="currentBitrateValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Average Bitrate:</span>
+                            <span class="info-item__value" id="averageBitrateValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Max Bitrate:</span>
+                            <span class="info-item__value" id="maxBitrateValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Current Bandwidth:</span>
+                            <span class="info-item__value" id="currentBandwidthValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Buffer Length:</span>
+                            <span class="info-item__value" id="bufferLengthValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Rebuffer Count:</span>
+                            <span class="info-item__value" id="rebufferCountValue">0</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Rebuffer Ratio:</span>
+                            <span class="info-item__value" id="rebufferRatioValue">0.00 %</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Watch Time:</span>
+                            <span class="info-item__value" id="watchTimeValue">0s</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Stream Quality:</span>
+                            <span class="info-item__value" id="streamQualityValue">-</span>
                         </div>
                     </div>
                 </div>
             `;
 
             // Chèn làm panel đầu tiên trong dashboard
-            dashboardGrid.insertBefore(startupPanel, dashboardGrid.firstChild);
+            dashboardGrid.insertBefore(overviewPanel, dashboardGrid.firstChild);
 
-            console.log('Startup metrics panel created');
+            console.log('Overview metrics panel created');
         } catch (error) {
-            console.error('Error creating startup panel:', error);
+            console.error('Error creating overview panel:', error);
         }
+    }
+
+    /**
+     * Tạo startup metrics panel trong dashboard - DEPRECATED
+     * Sử dụng createOverviewPanel() thay thế
+     */
+    createStartupPanel() {
+        console.warn('createStartupPanel is deprecated, using createOverviewPanel instead');
+        this.createOverviewPanel();
     }
 
     /**
@@ -581,30 +778,102 @@ export default class PerformanceTracker {
     }
 
     /**
+     * Reset bitrate, bandwidth và buffer metrics
+     */
+    resetBitrateAndBufferMetrics() {
+        try {
+            // Clear bitrate check interval
+            if (this.bitrateCheckInterval) {
+                clearInterval(this.bitrateCheckInterval);
+                this.bitrateCheckInterval = null;
+            }
+
+            this.metrics.bitrate = {
+                current_bitrate: 0,
+                average_bitrate: 0,
+                max_bitrate: 0,
+                bitrate_history: [],
+                bitrate_sum: 0,
+                bitrate_count: 0
+            };
+
+            this.metrics.bandwidth = {
+                current_bandwidth: 0,
+                bandwidth_history: [],
+                last_bandwidth_update: null
+            };
+
+            this.metrics.buffer = {
+                buffer_length: 0,
+                last_buffer_update: null
+            };
+
+            console.log('Bitrate, bandwidth and buffer metrics reset');
+        } catch (error) {
+            console.error('Error resetting bitrate and buffer metrics:', error);
+        }
+    }
+
+    /**
      * Bắt đầu đo watch time khi video bắt đầu phát
      */
     startWatchTime() {
         try {
-            // Reset accumulated watch time cho session mới
-            this.metrics.rebuffering.watch_time_accumulated = 0;
-            this.metrics.rebuffering.total_watch_time = 0;
+            // Chỉ reset nếu chưa có watch time (session mới thật sự)
+            const hasExistingWatchTime = this.metrics.rebuffering.watch_time_accumulated > 0 || this.metrics.rebuffering.total_watch_time > 0;
+
+            if (!hasExistingWatchTime) {
+                this.metrics.rebuffering.watch_time_accumulated = 0;
+                this.metrics.rebuffering.total_watch_time = 0;
+            }
+
             this.metrics.rebuffering.is_first_playing = true;
 
-            // Bắt đầu đo từ thời điểm này
-            this.metrics.rebuffering.watch_time_start = performance.now();
+            // KHÔNG bắt đầu đo ngay - chờ video thực sự play
+            this.metrics.rebuffering.watch_time_start = null;
 
-
+            // Initialize playback session
+            this.metrics.playback.session_start_time = performance.now();
+            this.metrics.playback.is_playing = false;
+            this.metrics.playback.is_paused = false;
+            this.metrics.playback.is_buffering = false;
+            this.metrics.playback.playback_start_time = null;
 
             // Start real-time updates for rebuffering metrics
             this.startRealTimeUpdates();
-            console.log('Watch time measurement started with new logic');
+
+
         } catch (error) {
             console.error('Error starting watch time measurement:', error);
         }
     }
 
     /**
-     * Bắt đầu cập nhật real-time cho rebuffering metrics
+     * Manually update bitrate from HLS instance
+     */
+    updateBitrateFromHLS() {
+        try {
+            if (this.hlsInstance) {
+                // Update bitrate from current level
+                if (this.hlsInstance.levels && this.hlsInstance.currentLevel >= 0) {
+                    const currentLevel = this.hlsInstance.levels[this.hlsInstance.currentLevel];
+                    if (currentLevel && currentLevel.bitrate) {
+                        this.updateBitrateMetrics(currentLevel.bitrate);
+                    }
+                }
+
+                // Update bandwidth from HLS bandwidth estimate
+                if (this.hlsInstance.bandwidthEstimate && this.hlsInstance.bandwidthEstimate > 0) {
+                    this.updateBandwidthMetrics(this.hlsInstance.bandwidthEstimate / 1000000); // Mbps
+                }
+            }
+        } catch (error) {
+            console.error('Error updating bitrate from HLS:', error);
+        }
+    }
+
+    /**
+     * Bắt đầu cập nhật real-time cho tất cả metrics
      */
     startRealTimeUpdates() {
         try {
@@ -616,10 +885,19 @@ export default class PerformanceTracker {
             // Update every 500ms for smooth real-time display
             this.realTimeUpdateInterval = setInterval(() => {
                 this.updateWatchTime();
+
+                // Cập nhật buffer metrics nếu có video element
+                if (this.videoElement) {
+                    this.updateBufferMetrics(this.videoElement);
+                }
+
+                // Manually update bitrate from HLS instance
+                this.updateBitrateFromHLS();
+
                 this.updateRebufferDisplay();
             }, 500);
 
-            console.log('Real-time rebuffering updates started');
+            console.log('Real-time updates started for all metrics');
         } catch (error) {
             console.error('Error starting real-time updates:', error);
         }
@@ -645,8 +923,10 @@ export default class PerformanceTracker {
      */
     updateWatchTime() {
         try {
-            // Sử dụng logic mới từ timeupdate
-            this.updateWatchTimeFromTimeUpdate();
+            // Chỉ update nếu video đang thực sự play
+            if (this.videoElement && !this.videoElement.paused && !this.videoElement.seeking && !document.hidden) {
+                this.updateWatchTimeFromTimeUpdate();
+            }
         } catch (error) {
             console.error('Error updating watch time:', error);
         }
@@ -691,25 +971,197 @@ export default class PerformanceTracker {
     }
 
     /**
-     * Cập nhật hiển thị rebuffering metrics theo thời gian thực
+     * Cập nhật bitrate metrics
+     */
+    updateBitrateMetrics(currentBitrate) {
+        try {
+            if (currentBitrate && currentBitrate > 0) {
+                this.metrics.bitrate.current_bitrate = currentBitrate;
+
+                // Cập nhật max bitrate
+                if (currentBitrate > this.metrics.bitrate.max_bitrate) {
+                    this.metrics.bitrate.max_bitrate = currentBitrate;
+                }
+
+                // Cập nhật average bitrate
+                this.metrics.bitrate.bitrate_history.push(currentBitrate);
+                this.metrics.bitrate.bitrate_sum += currentBitrate;
+                this.metrics.bitrate.bitrate_count++;
+
+                // Giữ lại chỉ 100 giá trị gần nhất để tính average
+                if (this.metrics.bitrate.bitrate_history.length > 100) {
+                    const removed = this.metrics.bitrate.bitrate_history.shift();
+                    this.metrics.bitrate.bitrate_sum -= removed;
+                    this.metrics.bitrate.bitrate_count--;
+                }
+
+                this.metrics.bitrate.average_bitrate = this.metrics.bitrate.bitrate_sum / this.metrics.bitrate.bitrate_count;
+            }
+        } catch (error) {
+            console.error('Error updating bitrate metrics:', error);
+        }
+    }
+
+    /**
+     * Cập nhật bandwidth metrics
+     */
+    updateBandwidthMetrics(currentBandwidth) {
+        try {
+            if (currentBandwidth && currentBandwidth > 0) {
+                this.metrics.bandwidth.current_bandwidth = currentBandwidth;
+                const now = performance.now();
+                this.metrics.bandwidth.last_bandwidth_update = now;
+
+                // Chỉ lưu lịch sử bandwidth mỗi 10 giây
+                const lastHistoryTime = this.metrics.bandwidth.bandwidth_history.length > 0
+                    ? this.metrics.bandwidth.bandwidth_history[this.metrics.bandwidth.bandwidth_history.length - 1].timestamp
+                    : 0;
+
+                if (now - lastHistoryTime >= 10000) { // 10 seconds
+                    this.metrics.bandwidth.bandwidth_history.push({
+                        value: currentBandwidth,
+                        timestamp: now
+                    });
+
+                    // Giữ lại chỉ 50 giá trị gần nhất (500 giây = ~8 phút)
+                    if (this.metrics.bandwidth.bandwidth_history.length > 50) {
+                        this.metrics.bandwidth.bandwidth_history.shift();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error updating bandwidth metrics:', error);
+        }
+    }
+
+    /**
+     * Cập nhật buffer length metrics
+     */
+    updateBufferMetrics(videoElement) {
+        try {
+            if (videoElement && videoElement.buffered && videoElement.buffered.length > 0) {
+                const currentTime = videoElement.currentTime;
+                let bufferLength = 0;
+
+                // Tìm buffer range chứa current time
+                for (let i = 0; i < videoElement.buffered.length; i++) {
+                    const start = videoElement.buffered.start(i);
+                    const end = videoElement.buffered.end(i);
+
+                    if (currentTime >= start && currentTime <= end) {
+                        bufferLength = end - currentTime;
+                        break;
+                    }
+                }
+
+                this.metrics.buffer.buffer_length = bufferLength;
+                this.metrics.buffer.last_buffer_update = performance.now();
+            }
+        } catch (error) {
+            console.error('Error updating buffer metrics:', error);
+        }
+    }
+
+    /**
+     * Lấy bitrate metrics hiện tại
+     */
+    getBitrateMetrics() {
+        return { ...this.metrics.bitrate };
+    }
+
+    /**
+     * Lấy bandwidth metrics hiện tại
+     */
+    getBandwidthMetrics() {
+        return { ...this.metrics.bandwidth };
+    }
+
+    /**
+     * Check current bitrate from HLS instance
+     */
+    checkCurrentBitrate() {
+        try {
+            if (this.hlsInstance && this.hlsInstance.levels && this.hlsInstance.currentLevel >= 0) {
+                const currentLevel = this.hlsInstance.levels[this.hlsInstance.currentLevel];
+                if (currentLevel && currentLevel.bitrate && currentLevel.bitrate !== this.metrics.bitrate.current_bitrate) {
+                    console.log('Periodic bitrate check - updating:', currentLevel.bitrate);
+                    this.updateBitrateMetrics(currentLevel.bitrate);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking current bitrate:', error);
+        }
+    }
+
+    /**
+     * Lấy buffer metrics hiện tại
+     */
+    getBufferMetrics() {
+        return { ...this.metrics.buffer };
+    }
+
+    /**
+     * Debug method để kiểm tra HLS instance và bitrate
+     */
+    debugBitrateTracking() {
+        console.log('=== Bitrate Tracking Debug ===');
+        console.log('HLS Instance:', !!this.hlsInstance);
+        if (this.hlsInstance) {
+            console.log('HLS Levels:', this.hlsInstance.levels);
+            console.log('Current Level:', this.hlsInstance.currentLevel);
+            if (this.hlsInstance.levels && this.hlsInstance.currentLevel >= 0) {
+                const currentLevel = this.hlsInstance.levels[this.hlsInstance.currentLevel];
+                console.log('Current Level Data:', currentLevel);
+            }
+        }
+        console.log('Current Metrics:', this.metrics.bitrate);
+        console.log('==============================');
+    }
+
+    /**
+     * Format time display - hiển thị giây chẵn, >60s thì hiển thị phút
+     */
+    formatWatchTime(seconds) {
+        const roundedSeconds = Math.floor(seconds);
+
+        if (roundedSeconds < 60) {
+            return `${roundedSeconds}s`;
+        } else {
+            const minutes = Math.floor(roundedSeconds / 60);
+            const remainingSeconds = roundedSeconds % 60;
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+    }
+
+    /**
+     * Cập nhật hiển thị rebuffering metrics trong overview panel
      */
     updateRebufferDisplay() {
         try {
-            // Tìm hoặc tạo rebuffering metrics panel
-            let rebufferPanel = document.getElementById('rebufferMetricsPanel');
+            // Tìm hoặc tạo overview panel
+            let overviewPanel = document.getElementById('overviewMetricsPanel');
 
-            if (!rebufferPanel) {
-                this.createRebufferPanel();
-                rebufferPanel = document.getElementById('rebufferMetricsPanel');
+            if (!overviewPanel) {
+                this.createOverviewPanel();
+                overviewPanel = document.getElementById('overviewMetricsPanel');
             }
 
-            if (rebufferPanel) {
-                const rebufferCountElement = rebufferPanel.querySelector('#rebufferCountValue');
-                const rebufferDurationElement = rebufferPanel.querySelector('#rebufferDurationValue');
-                const rebufferRatioElement = rebufferPanel.querySelector('#rebufferRatioValue');
-                const rebufferStatusElement = rebufferPanel.querySelector('#rebufferStatus');
-                const watchTimeElement = rebufferPanel.querySelector('#watchTimeValue');
-                const impactLevelElement = rebufferPanel.querySelector('#impactLevelValue');
+            if (overviewPanel) {
+                const rebufferCountElement = overviewPanel.querySelector('#rebufferCountValue');
+                const rebufferRatioElement = overviewPanel.querySelector('#rebufferRatioValue');
+                const watchTimeElement = overviewPanel.querySelector('#watchTimeValue');
+                const streamQualityElement = overviewPanel.querySelector('#streamQualityValue');
+
+                // Bitrate elements
+                const currentBitrateElement = overviewPanel.querySelector('#currentBitrateValue');
+                const averageBitrateElement = overviewPanel.querySelector('#averageBitrateValue');
+                const maxBitrateElement = overviewPanel.querySelector('#maxBitrateValue');
+
+                // Bandwidth element
+                const currentBandwidthElement = overviewPanel.querySelector('#currentBandwidthValue');
+
+                // Buffer element
+                const bufferLengthElement = overviewPanel.querySelector('#bufferLengthValue');
 
                 if (rebufferCountElement) {
                     rebufferCountElement.textContent = this.metrics.rebuffering.rebuffer_count;
@@ -728,10 +1180,6 @@ export default class PerformanceTracker {
                     } else {
                         rebufferCountElement.title = 'No rebuffering events detected';
                     }
-                }
-
-                if (rebufferDurationElement) {
-                    rebufferDurationElement.textContent = this.metrics.rebuffering.rebuffer_duration.toFixed(2) + ' s';
                 }
 
                 if (rebufferRatioElement) {
@@ -754,46 +1202,98 @@ export default class PerformanceTracker {
                     }
                 }
 
-                if (rebufferStatusElement) {
-                    if (this.isWaitingForBuffer) {
-                        rebufferStatusElement.textContent = 'Rebuffering...';
-                        rebufferStatusElement.className = 'info-item__value rebuffer-active';
-                    } else if (this.metrics.rebuffering.is_first_playing) {
-                        rebufferStatusElement.textContent = 'Startup';
-                        rebufferStatusElement.className = 'info-item__value startup-measuring';
-                    } else if (this.metrics.rebuffering.rebuffer_count > 0) {
-                        rebufferStatusElement.textContent = 'Playing';
-                        rebufferStatusElement.className = 'info-item__value';
-                    } else {
-                        rebufferStatusElement.textContent = 'Ready';
-                        rebufferStatusElement.className = 'info-item__value';
-                    }
-                }
-
                 if (watchTimeElement) {
                     const totalWatchTime = this.metrics.rebuffering.total_watch_time;
                     const accumulatedTime = this.metrics.rebuffering.watch_time_accumulated;
-                    watchTimeElement.textContent = totalWatchTime.toFixed(2) + ' s';
+                    watchTimeElement.textContent = this.formatWatchTime(totalWatchTime);
                     watchTimeElement.title = `Total: ${totalWatchTime.toFixed(2)}s, Accumulated: ${accumulatedTime.toFixed(2)}s`;
                 }
 
-                if (impactLevelElement) {
-                    let impactLevel = 'None';
-                    let impactClass = 'info-item__value';
+                if (streamQualityElement) {
+                    let qualityLevel = 'Unknown';
+                    let qualityClass = 'info-item__value';
 
-                    if (this.metrics.rebuffering.rebuffer_ratio > 10) {
-                        impactLevel = 'High Impact';
-                        impactClass += ' rebuffer-high';
-                    } else if (this.metrics.rebuffering.rebuffer_ratio > 5) {
-                        impactLevel = 'Medium Impact';
-                        impactClass += ' rebuffer-medium';
-                    } else if (this.metrics.rebuffering.rebuffer_ratio > 0) {
-                        impactLevel = 'Low Impact';
-                        impactClass += ' rebuffer-low';
+                    if (this.metrics.rebuffering.rebuffer_ratio === 0 && this.metrics.rebuffering.rebuffer_count === 0) {
+                        qualityLevel = 'Excellent';
+                        qualityClass += ' rebuffer-low';
+                    } else if (this.metrics.rebuffering.rebuffer_ratio <= 2) {
+                        qualityLevel = 'Good';
+                        qualityClass += ' rebuffer-low';
+                    } else if (this.metrics.rebuffering.rebuffer_ratio <= 5) {
+                        qualityLevel = 'Fair';
+                        qualityClass += ' rebuffer-medium';
+                    } else {
+                        qualityLevel = 'Poor';
+                        qualityClass += ' rebuffer-high';
                     }
 
-                    impactLevelElement.textContent = impactLevel;
-                    impactLevelElement.className = impactClass;
+                    streamQualityElement.textContent = qualityLevel;
+                    streamQualityElement.className = qualityClass;
+                }
+
+                // Cập nhật bitrate metrics
+                if (currentBitrateElement) {
+                    const currentBitrate = this.metrics.bitrate.current_bitrate;
+                    if (currentBitrate > 0) {
+                        currentBitrateElement.textContent = `${(currentBitrate / 1000000).toFixed(1)} Mbps`;
+                    } else {
+                        currentBitrateElement.textContent = '-';
+                    }
+                }
+
+                if (averageBitrateElement) {
+                    const avgBitrate = this.metrics.bitrate.average_bitrate;
+                    if (avgBitrate > 0) {
+                        averageBitrateElement.textContent = `${(avgBitrate / 1000000).toFixed(1)} Mbps`;
+                    } else {
+                        averageBitrateElement.textContent = '-';
+                    }
+                }
+
+                if (maxBitrateElement) {
+                    const maxBitrate = this.metrics.bitrate.max_bitrate;
+                    if (maxBitrate > 0) {
+                        maxBitrateElement.textContent = `${(maxBitrate / 1000000).toFixed(1)} Mbps`;
+                    } else {
+                        maxBitrateElement.textContent = '-';
+                    }
+                }
+
+                // Cập nhật bandwidth metrics
+                if (currentBandwidthElement) {
+                    const currentBandwidth = this.metrics.bandwidth.current_bandwidth;
+                    if (currentBandwidth > 0) {
+                        currentBandwidthElement.textContent = `${currentBandwidth.toFixed(1)} Mbps`;
+                    } else {
+                        currentBandwidthElement.textContent = '-';
+                    }
+                }
+
+                // Cập nhật buffer metrics
+                if (bufferLengthElement) {
+                    const bufferLength = this.metrics.buffer.buffer_length;
+                    if (bufferLength > 0) {
+                        bufferLengthElement.textContent = `${bufferLength.toFixed(1)} s`;
+
+                        // Thêm color coding cho buffer health
+                        bufferLengthElement.className = 'info-item__value';
+                        if (bufferLength > 10) {
+                            bufferLengthElement.classList.add('rebuffer-low');
+                            bufferLengthElement.title = 'Healthy buffer - excellent streaming experience';
+                        } else if (bufferLength > 5) {
+                            bufferLengthElement.classList.add('rebuffer-medium');
+                            bufferLengthElement.title = 'Good buffer - stable streaming';
+                        } else if (bufferLength > 2) {
+                            bufferLengthElement.classList.add('rebuffer-medium');
+                            bufferLengthElement.title = 'Low buffer - may experience rebuffering';
+                        } else {
+                            bufferLengthElement.classList.add('rebuffer-high');
+                            bufferLengthElement.title = 'Critical buffer - high risk of rebuffering';
+                        }
+                    } else {
+                        bufferLengthElement.textContent = '-';
+                        bufferLengthElement.className = 'info-item__value';
+                    }
                 }
             }
         } catch (error) {
@@ -804,79 +1304,13 @@ export default class PerformanceTracker {
 
 
     /**
-     * Tạo rebuffering metrics panel trong dashboard
+     * Tạo rebuffering metrics panel trong dashboard - DEPRECATED
+     * Sử dụng createOverviewPanel() thay thế
      */
     createRebufferPanel() {
-        try {
-            const dashboardGrid = document.querySelector('.dashboard__grid');
-            if (!dashboardGrid) {
-                console.warn('Dashboard grid not found, cannot create rebuffer panel');
-                return;
-            }
-
-            const rebufferPanel = document.createElement('article');
-            rebufferPanel.className = 'card';
-            rebufferPanel.id = 'rebufferMetricsPanel';
-
-            rebufferPanel.innerHTML = `
-                <header class="card__header">
-                    <h2 class="card__title">
-                        <i class="fas fa-pause-circle"></i>
-                        Rebuffering Analytics
-                    </h2>
-                </header>
-                <div class="card__content">
-                    <div class="info-grid">
-                        <div class="info-item">
-                            <span class="info-item__label">Rebuffer Count:</span>
-                            <span class="info-item__value" id="rebufferCountValue">0</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-item__label">Rebuffer Duration:</span>
-                            <span class="info-item__value" id="rebufferDurationValue">0.00 s</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-item__label">Rebuffer Ratio:</span>
-                            <span class="info-item__value rebuffer-low" id="rebufferRatioValue">0.00 %</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-item__label">Status:</span>
-                            <span class="info-item__value" id="rebufferStatus">Ready</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-item__label">Watch Time:</span>
-                            <span class="info-item__value" id="watchTimeValue">0.00 s</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-item__label">Impact Level:</span>
-                            <span class="info-item__value" id="impactLevelValue">None</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-item__label">Min Duration:</span>
-                            <span class="info-item__value" id="minDurationValue">250 ms</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-item__label">Detection:</span>
-                            <span class="info-item__value" id="detectionModeValue">Event-based</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Chèn sau startup panel nếu có, hoặc làm panel đầu tiên
-            const startupPanel = document.getElementById('startupMetricsPanel');
-            if (startupPanel && startupPanel.nextSibling) {
-                dashboardGrid.insertBefore(rebufferPanel, startupPanel.nextSibling);
-            } else if (startupPanel) {
-                dashboardGrid.insertBefore(rebufferPanel, startupPanel.nextSibling);
-            } else {
-                dashboardGrid.insertBefore(rebufferPanel, dashboardGrid.firstChild);
-            }
-
-            console.log('Rebuffering metrics panel created');
-        } catch (error) {
-            console.error('Error creating rebuffer panel:', error);
-        }
+        console.warn('createRebufferPanel is deprecated, using createOverviewPanel instead');
+        // Không tạo panel riêng nữa, sử dụng overview panel
+        return;
     }
 
     /**
@@ -887,20 +1321,26 @@ export default class PerformanceTracker {
             // Stop real-time updates
             this.stopRealTimeUpdates();
 
+            // Preserve watch time accumulated khi reset
+            const preservedWatchTime = this.metrics.rebuffering.watch_time_accumulated || 0;
+            const preservedTotalTime = this.metrics.rebuffering.total_watch_time || 0;
+
+
+
             this.metrics.rebuffering = {
                 rebuffer_count: 0,
                 rebuffer_duration: 0,
                 rebuffer_ratio: 0,
                 current_rebuffer_start: null,
                 watch_time_start: null,
-                total_watch_time: 0,
+                total_watch_time: preservedTotalTime,
                 last_rebuffer_time: null,
                 // Reset các field mới
                 is_first_playing: true,
                 last_timeupdate_time: null,
                 last_current_time: 0,
                 min_rebuffer_duration: 250,
-                watch_time_accumulated: 0,
+                watch_time_accumulated: preservedWatchTime,
                 last_watch_time_checkpoint: null
             };
 
@@ -911,8 +1351,7 @@ export default class PerformanceTracker {
 
             this.updateRebufferDisplay();
 
-            // Also reset playback metrics
-            this.resetPlaybackMetrics();
+            // Playback metrics reset removed - total_playback_time no longer used
 
             console.log('Rebuffering metrics reset with new logic');
         } catch (error) {
@@ -961,7 +1400,6 @@ export default class PerformanceTracker {
                     }
 
                     const sessionDuration = (currentTime - this.metrics.playback.playback_start_time) / 1000;
-                    this.metrics.playback.total_playback_time += sessionDuration;
                 }
 
                 this.metrics.playback.is_buffering = true;
@@ -1037,7 +1475,7 @@ export default class PerformanceTracker {
     updatePlaybackMetrics() {
         try {
             // Calculate current total playback time including active session
-            let currentTotalPlaybackTime = this.metrics.playback.total_playback_time;
+            let currentTotalPlaybackTime = 0;
 
             if (this.metrics.playback.is_playing &&
                 !this.metrics.playback.is_buffering &&
@@ -1105,14 +1543,14 @@ export default class PerformanceTracker {
                 const efficiencyLevelElement = playbackPanel.querySelector('#efficiencyLevelValue');
 
                 // Use display value if available, otherwise use stored value
-                const displayTime = this.displayPlaybackTime || this.metrics.playback.total_playback_time;
+                const displayTime = this.displayPlaybackTime || 0;
 
                 if (totalPlaybackElement) {
                     totalPlaybackElement.textContent = displayTime.toFixed(2) + ' s';
                 }
 
                 if (watchTimeElement) {
-                    watchTimeElement.textContent = this.metrics.playback.watch_time.toFixed(2) + ' s';
+                    watchTimeElement.textContent = this.formatWatchTime(this.metrics.playback.watch_time);
                 }
 
                 if (playbackRatioElement) {
@@ -1202,7 +1640,7 @@ export default class PerformanceTracker {
     updatePlaybackMetrics() {
         try {
             // Calculate current total playback time including active session
-            let currentPlaybackTime = this.metrics.playback.total_playback_time;
+            let currentPlaybackTime = 0;
 
             if (this.metrics.playback.is_playing &&
                 !this.metrics.playback.is_buffering &&
@@ -1237,7 +1675,7 @@ export default class PerformanceTracker {
             }
 
             // Update the stored total for display
-            this.metrics.playback.total_playback_time = currentPlaybackTime;
+            // total_playback_time removed - no longer used
         } catch (error) {
             console.error('Error updating playback metrics:', error);
         }
@@ -1272,14 +1710,14 @@ export default class PerformanceTracker {
                 const efficiencyLevelElement = playbackPanel.querySelector('#efficiencyLevelValue');
 
                 // Use display value if available, otherwise use stored value
-                const displayTime = this.displayPlaybackTime || this.metrics.playback.total_playback_time;
+                const displayTime = this.displayPlaybackTime || 0;
 
                 if (totalPlaybackElement) {
                     totalPlaybackElement.textContent = displayTime.toFixed(2) + ' s';
                 }
 
                 if (watchTimeElement) {
-                    watchTimeElement.textContent = this.metrics.playback.watch_time.toFixed(2) + ' s';
+                    watchTimeElement.textContent = this.formatWatchTime(this.metrics.playback.watch_time);
                 }
 
                 if (playbackRatioElement) {
@@ -1345,22 +1783,6 @@ export default class PerformanceTracker {
             }
         } catch (error) {
             console.error('Error updating playback display:', error);
-        }
-    }
-
-
-
-
-
-    /**
-     * Set video element for frame statistics collection
-     */
-    setVideoElement(videoElement) {
-        try {
-            this.metrics.frames.video_element = videoElement;
-            console.log('Video element set for frame statistics collection');
-        } catch (error) {
-            console.error('Error setting video element:', error);
         }
     }
 
@@ -1485,11 +1907,14 @@ export default class PerformanceTracker {
             if (fps === null) {
                 const now = performance.now();
 
-                if (this.metrics.fps.last_frame_time) {
-                    const deltaTime = now - this.metrics.fps.last_frame_time;
-                    if (deltaTime > 0) {
-                        fps = 1000 / deltaTime; // Convert to FPS
-                    }
+                if (this.metrics.fps.last_frame_time === null) {
+                    this.metrics.fps.last_frame_time = now;
+                    return; // Skip first frame để có baseline
+                }
+
+                const deltaTime = now - this.metrics.fps.last_frame_time;
+                if (deltaTime > 0) {
+                    fps = 1000 / deltaTime; // Convert to FPS
                 }
 
                 this.metrics.fps.last_frame_time = now;
@@ -1519,7 +1944,13 @@ export default class PerformanceTracker {
                     this.metrics.fps.avg_fps = sum / this.metrics.fps.fps_samples.length;
                 }
 
-                this.updateFPSDisplay();
+                // Chỉ update display mỗi 500ms để tránh spam
+                const now = performance.now();
+                if (!this.metrics.fps.last_display_update ||
+                    now - this.metrics.fps.last_display_update > 500) {
+                    this.updateFPSDisplay();
+                    this.metrics.fps.last_display_update = now;
+                }
             }
         } catch (error) {
             console.error('Error updating FPS:', error);
@@ -1534,25 +1965,41 @@ export default class PerformanceTracker {
     }
 
     /**
-     * Start FPS monitoring using requestAnimationFrame
+     * Start FPS monitoring using optimized interval approach
      */
     startFPSMonitoring() {
         try {
-            if (this.fpsAnimationFrame) {
-                cancelAnimationFrame(this.fpsAnimationFrame);
-            }
+            // Stop existing monitoring
+            this.stopFPSMonitoring();
 
             this.metrics.fps.measurement_start_time = performance.now();
             this.metrics.fps.last_frame_time = null;
             this.metrics.fps.frame_count = 0;
+            this.metrics.fps.last_display_update = null;
+
+            // Sử dụng approach tối ưu hơn: đo FPS mỗi 100ms thay vì mỗi frame
+            let frameCount = 0;
+            let lastTime = performance.now();
 
             const measureFPS = () => {
-                this.updateFPS();
+                const now = performance.now();
+                frameCount++;
+
+                // Tính FPS mỗi 100ms
+                const elapsed = now - lastTime;
+                if (elapsed >= 100) { // 100ms interval
+                    const fps = (frameCount * 1000) / elapsed;
+                    this.updateFPS(fps);
+
+                    frameCount = 0;
+                    lastTime = now;
+                }
+
                 this.fpsAnimationFrame = requestAnimationFrame(measureFPS);
             };
 
             this.fpsAnimationFrame = requestAnimationFrame(measureFPS);
-            console.log('FPS monitoring started');
+            console.log('Optimized FPS monitoring started');
         } catch (error) {
             console.error('Error starting FPS monitoring:', error);
         }
@@ -1566,10 +2013,125 @@ export default class PerformanceTracker {
             if (this.fpsAnimationFrame) {
                 cancelAnimationFrame(this.fpsAnimationFrame);
                 this.fpsAnimationFrame = null;
-                console.log('FPS monitoring stopped');
             }
+
+            if (this.fpsVideoInterval) {
+                clearInterval(this.fpsVideoInterval);
+                this.fpsVideoInterval = null;
+            }
+
+            console.log('FPS monitoring stopped');
         } catch (error) {
             console.error('Error stopping FPS monitoring:', error);
+        }
+    }
+
+    /**
+     * Alternative FPS measurement using video element statistics
+     */
+    measureVideoFPS() {
+        try {
+            if (!this.videoElement) {
+                console.warn('No video element available for FPS measurement');
+                return;
+            }
+
+            // Try to get video frame statistics
+            let fps = null;
+
+            // Method 1: Use getVideoPlaybackQuality API (Chrome/Firefox)
+            if (typeof this.videoElement.getVideoPlaybackQuality === 'function') {
+                const quality = this.videoElement.getVideoPlaybackQuality();
+                if (quality && quality.totalVideoFrames !== undefined) {
+                    const now = performance.now();
+
+                    if (this.metrics.fps.last_quality_check) {
+                        const timeDiff = (now - this.metrics.fps.last_quality_check) / 1000; // seconds
+                        const frameDiff = quality.totalVideoFrames - (this.metrics.fps.last_total_frames || 0);
+
+                        if (timeDiff > 0 && frameDiff > 0) {
+                            fps = frameDiff / timeDiff;
+                        }
+                    }
+
+                    this.metrics.fps.last_quality_check = now;
+                    this.metrics.fps.last_total_frames = quality.totalVideoFrames;
+                }
+            }
+
+            // Method 2: Use webkitDecodedFrameCount (Safari/Chrome)
+            if (fps === null && typeof this.videoElement.webkitDecodedFrameCount !== 'undefined') {
+                const now = performance.now();
+                const currentFrames = this.videoElement.webkitDecodedFrameCount;
+
+                if (this.metrics.fps.last_webkit_check) {
+                    const timeDiff = (now - this.metrics.fps.last_webkit_check) / 1000;
+                    const frameDiff = currentFrames - (this.metrics.fps.last_webkit_frames || 0);
+
+                    if (timeDiff > 0 && frameDiff > 0) {
+                        fps = frameDiff / timeDiff;
+                    }
+                }
+
+                this.metrics.fps.last_webkit_check = now;
+                this.metrics.fps.last_webkit_frames = currentFrames;
+            }
+
+            // Update FPS if we got a valid measurement
+            if (fps !== null && fps > 0 && fps <= 120) { // Reasonable FPS range
+                this.updateFPS(fps);
+                console.log(`Video FPS measured: ${fps.toFixed(1)}`);
+            }
+
+        } catch (error) {
+            console.error('Error measuring video FPS:', error);
+        }
+    }
+
+    /**
+     * Start hybrid FPS monitoring (combines requestAnimationFrame + video stats)
+     */
+    startHybridFPSMonitoring() {
+        try {
+            this.stopFPSMonitoring();
+
+            // Reset metrics
+            this.metrics.fps.measurement_start_time = performance.now();
+            this.metrics.fps.last_frame_time = null;
+            this.metrics.fps.frame_count = 0;
+            this.metrics.fps.last_display_update = null;
+            this.metrics.fps.last_quality_check = null;
+            this.metrics.fps.last_webkit_check = null;
+
+            // Primary method: requestAnimationFrame (optimized)
+            let frameCount = 0;
+            let lastTime = performance.now();
+
+            const measureFPS = () => {
+                const now = performance.now();
+                frameCount++;
+
+                const elapsed = now - lastTime;
+                if (elapsed >= 200) { // Measure every 200ms
+                    const fps = (frameCount * 1000) / elapsed;
+                    this.updateFPS(fps);
+
+                    frameCount = 0;
+                    lastTime = now;
+                }
+
+                this.fpsAnimationFrame = requestAnimationFrame(measureFPS);
+            };
+
+            // Secondary method: Video element stats (every 1 second)
+            this.fpsVideoInterval = setInterval(() => {
+                this.measureVideoFPS();
+            }, 1000);
+
+            this.fpsAnimationFrame = requestAnimationFrame(measureFPS);
+            console.log('Hybrid FPS monitoring started');
+        } catch (error) {
+            console.error('Error starting hybrid FPS monitoring:', error);
         }
     }
 
@@ -1742,20 +2304,14 @@ export default class PerformanceTracker {
             const rebufferPanel = document.getElementById('rebufferMetricsPanel');
             const startupPanel = document.getElementById('startupMetricsPanel');
 
-            if (playbackPanel && playbackPanel.nextSibling) {
-                dashboardGrid.insertBefore(framePanel, playbackPanel.nextSibling);
-            } else if (playbackPanel) {
-                dashboardGrid.insertBefore(framePanel, playbackPanel.nextSibling);
-            } else if (rebufferPanel && rebufferPanel.nextSibling) {
-                dashboardGrid.insertBefore(framePanel, rebufferPanel.nextSibling);
-            } else if (rebufferPanel) {
-                dashboardGrid.insertBefore(framePanel, rebufferPanel.nextSibling);
-            } else if (startupPanel && startupPanel.nextSibling) {
-                dashboardGrid.insertBefore(framePanel, startupPanel.nextSibling);
-            } else if (startupPanel) {
-                dashboardGrid.insertBefore(framePanel, startupPanel.nextSibling);
+            // Insert after Data Consumption card (position 6)
+            const dataCard = document.getElementById('dataConsumptionPanel');
+            if (dataCard && dataCard.nextSibling) {
+                dashboardGrid.insertBefore(framePanel, dataCard.nextSibling);
+            } else if (dataCard) {
+                dashboardGrid.insertBefore(framePanel, dataCard.nextSibling);
             } else {
-                dashboardGrid.insertBefore(framePanel, dashboardGrid.firstChild);
+                dashboardGrid.appendChild(framePanel);
             }
 
             console.log('Frame metrics panel created');
@@ -1789,7 +2345,8 @@ export default class PerformanceTracker {
                 fps_samples: [],
                 last_frame_time: null,
                 frame_count: 0,
-                measurement_start_time: null
+                measurement_start_time: null,
+                last_display_update: null
             };
 
             this.updateFrameDisplay();
@@ -2015,11 +2572,12 @@ export default class PerformanceTracker {
             `;
 
             // Insert after frame panel if it exists, otherwise at the end
+            // Insert after Frame Performance card (position 7)
             const framePanel = document.getElementById('frameMetricsPanel');
             if (framePanel && framePanel.nextSibling) {
                 dashboardGrid.insertBefore(segmentPanel, framePanel.nextSibling);
             } else if (framePanel) {
-                dashboardGrid.appendChild(segmentPanel);
+                dashboardGrid.insertBefore(segmentPanel, framePanel.nextSibling);
             } else {
                 dashboardGrid.appendChild(segmentPanel);
             }

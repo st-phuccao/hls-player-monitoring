@@ -237,7 +237,6 @@ class ProfessionalDashboard {
   
   // Playback Tracking
   playback: {
-    total_playback_time: number, // seconds of actual playback (excluding pauses/buffers)
     watch_time: number, // total session time
     playback_ratio: number // percentage of actual playback vs total time
   },
@@ -325,7 +324,7 @@ class ProfessionalDashboard {
     rebuffer_count: number,
     rebuffer_duration: number,
     rebuffer_ratio: number,
-    total_playback_time: number,
+
     dropped_frames: number,
     total_frames: number,
     dropped_frame_ratio: number,
@@ -374,7 +373,7 @@ The interface uses a professional grid-based layout optimized for comprehensive 
 3. **Professional Metrics Dashboard**
    - **Startup Performance Panel**: startup_time with visual indicator
    - **Rebuffering Analytics Panel**: count, duration, ratio with trend charts
-   - **Playback Quality Panel**: total_playback_time, frame metrics, FPS stats
+   - **Playback Quality Panel**: watch_time, frame metrics, FPS stats
    - **Bitrate Monitoring Panel**: current, average, bandwidth with real-time graphs
    - **Segment Performance Panel**: loading times, durations with min/max/avg
    - **Playlist Performance Panel**: reload times and frequency analysis

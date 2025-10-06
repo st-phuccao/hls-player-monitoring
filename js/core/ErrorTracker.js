@@ -19,6 +19,7 @@ export default class ErrorTracker {
         };
 
         this.hlsInstance = null;
+        this.dataConsumptionTracker = null;
         this.realTimeUpdateInterval = null;
         this.eventListeners = new Map();
 
@@ -42,6 +43,18 @@ export default class ErrorTracker {
             console.log('HLS instance set for error tracking');
         } catch (error) {
             console.error('Error setting HLS instance for error tracking:', error);
+        }
+    }
+
+    /**
+     * Set DataConsumptionTracker reference for total requests count
+     */
+    setDataConsumptionTracker(dataConsumptionTracker) {
+        try {
+            this.dataConsumptionTracker = dataConsumptionTracker;
+            console.log('DataConsumptionTracker reference set for error tracking');
+        } catch (error) {
+            console.error('Error setting DataConsumptionTracker reference:', error);
         }
     }
 
@@ -74,56 +87,11 @@ export default class ErrorTracker {
             // Main error event listener
             this.hlsInstance.on(window.Hls.Events.ERROR, (event, data) => {
                 this.handleHLSError(event, data);
-                this.incrementTotalEvents();
             });
 
-            // Fragment loading events for total event counting
-            this.hlsInstance.on(window.Hls.Events.FRAG_LOADING, () => {
-                this.incrementTotalEvents();
-            });
-
-            this.hlsInstance.on(window.Hls.Events.FRAG_LOADED, () => {
-                this.incrementTotalEvents();
-            });
-
+            // Only track fragment load emergency aborted as it's an error
             this.hlsInstance.on(window.Hls.Events.FRAG_LOAD_EMERGENCY_ABORTED, () => {
-                this.incrementTotalEvents();
                 this.recordError('network', 'Fragment load emergency aborted', 'Fragment loading was aborted due to emergency conditions');
-            });
-
-            // Manifest events for total event counting
-            this.hlsInstance.on(window.Hls.Events.MANIFEST_LOADING, () => {
-                this.incrementTotalEvents();
-            });
-
-            this.hlsInstance.on(window.Hls.Events.MANIFEST_LOADED, () => {
-                this.incrementTotalEvents();
-            });
-
-            this.hlsInstance.on(window.Hls.Events.MANIFEST_PARSED, () => {
-                this.incrementTotalEvents();
-            });
-
-            // Level events for total event counting
-            this.hlsInstance.on(window.Hls.Events.LEVEL_LOADING, () => {
-                this.incrementTotalEvents();
-            });
-
-            this.hlsInstance.on(window.Hls.Events.LEVEL_LOADED, () => {
-                this.incrementTotalEvents();
-            });
-
-            this.hlsInstance.on(window.Hls.Events.LEVEL_SWITCHED, () => {
-                this.incrementTotalEvents();
-            });
-
-            // Buffer events for total event counting
-            this.hlsInstance.on(window.Hls.Events.BUFFER_APPENDED, () => {
-                this.incrementTotalEvents();
-            });
-
-            this.hlsInstance.on(window.Hls.Events.BUFFER_FLUSHED, () => {
-                this.incrementTotalEvents();
             });
 
             console.log('HLS error event listeners setup complete');
@@ -231,17 +199,36 @@ export default class ErrorTracker {
     }
 
     /**
-     * Calculate error percentage based on total events vs error events
+     * Calculate error percentage based on total requests vs error events
      */
     calculateErrorPercentage() {
         try {
-            if (this.metrics.total_events > 0) {
-                this.metrics.error_percentage = (this.metrics.error_count / this.metrics.total_events) * 100;
+            // Use total requests from DataConsumptionTracker if available
+            let totalEvents = this.metrics.total_events || 0;
+            if (this.dataConsumptionTracker && typeof this.dataConsumptionTracker.getTotalRequests === 'function') {
+                const totalRequests = this.dataConsumptionTracker.getTotalRequests();
+                if (typeof totalRequests === 'number' && !isNaN(totalRequests)) {
+                    totalEvents = totalRequests;
+                    this.metrics.total_events = totalEvents; // Update for display
+                }
+            }
+
+            // Ensure error_count is valid
+            const errorCount = this.metrics.error_count || 0;
+
+            if (totalEvents > 0 && typeof errorCount === 'number' && !isNaN(errorCount)) {
+                this.metrics.error_percentage = (errorCount / totalEvents) * 100;
             } else {
+                this.metrics.error_percentage = 0;
+            }
+
+            // Ensure error_percentage is not NaN
+            if (isNaN(this.metrics.error_percentage)) {
                 this.metrics.error_percentage = 0;
             }
         } catch (error) {
             console.error('Error calculating error percentage:', error);
+            this.metrics.error_percentage = 0;
         }
     }
 
@@ -300,6 +287,9 @@ export default class ErrorTracker {
      */
     updateErrorDisplay() {
         try {
+            // Recalculate error percentage to get latest total requests count
+            this.calculateErrorPercentage();
+
             // Find or create error metrics panel
             let errorPanel = document.getElementById('errorMetricsPanel');
 
@@ -344,7 +334,8 @@ export default class ErrorTracker {
                 }
 
                 if (errorPercentageElement) {
-                    errorPercentageElement.textContent = this.metrics.error_percentage.toFixed(2) + '%';
+                    const percentage = isNaN(this.metrics.error_percentage) ? 0 : this.metrics.error_percentage;
+                    errorPercentageElement.textContent = percentage.toFixed(2) + '%';
 
                     // Add visual indicators based on error percentage
                     errorPercentageElement.className = 'info-item__value';
@@ -475,8 +466,14 @@ export default class ErrorTracker {
                 </div>
             `;
 
-            // Insert after existing panels
-            dashboardGrid.appendChild(errorPanel);
+            // Insert after User Information card (position 3)
+            const overviewCard = document.getElementById('overviewMetricsPanel');
+            if (overviewCard && overviewCard.nextSibling && overviewCard.nextSibling.nextSibling) {
+                // Insert after the second card (User Information)
+                dashboardGrid.insertBefore(errorPanel, overviewCard.nextSibling.nextSibling);
+            } else {
+                dashboardGrid.appendChild(errorPanel);
+            }
 
             console.log('Error metrics panel created');
         } catch (error) {

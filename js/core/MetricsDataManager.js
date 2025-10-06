@@ -21,7 +21,6 @@ export default class MetricsDataManager {
 
             // Playback Tracking
             playback: {
-                total_playback_time: 0,
                 watch_time: 0,
                 playback_ratio: 0
             },
@@ -46,8 +45,17 @@ export default class MetricsDataManager {
             bitrate: {
                 current_bitrate: 0,
                 avg_bitrate_played: 0,
+                max_bitrate: 0,
+                bitrate_history: [],
+                bitrate_sum: 0,
+                bitrate_count: 0
+            },
+
+            // Bandwidth Metrics
+            bandwidth: {
                 current_bandwidth: 0,
-                bitrate_history: []
+                bandwidth_history: [],
+                last_bandwidth_update: null
             },
 
             // Segment Performance
@@ -94,12 +102,27 @@ export default class MetricsDataManager {
                 stream_url: '',
                 is_live: false,
                 session_id: null
+            },
+
+            // User Information
+            user: {
+                user_agent: '',
+                browser_name: '',
+                browser_version: '',
+                platform: '',
+                language: '',
+                screen_resolution: '',
+                viewport_size: '',
+                connection_type: '',
+                connection_speed: '',
+                timezone: '',
+                timestamp: null
             }
         };
 
         this.trackerInstances = {
             performanceTracker: null,
-            bitrateMonitor: null,
+
             errorTracker: null,
             dataConsumptionTracker: null
         };
@@ -118,7 +141,7 @@ export default class MetricsDataManager {
         try {
             this.trackerInstances = {
                 performanceTracker: trackers.performanceTracker || null,
-                bitrateMonitor: trackers.bitrateMonitor || null,
+
                 errorTracker: trackers.errorTracker || null,
                 dataConsumptionTracker: trackers.dataConsumptionTracker || null
             };
@@ -126,6 +149,9 @@ export default class MetricsDataManager {
             // Initialize session information
             this.metrics.session.start_time = Date.now();
             this.metrics.session.session_id = this.generateSessionId();
+
+            // Initialize user information
+            this.initializeUserInformation();
 
             this.isInitialized = true;
             console.log('MetricsDataManager initialized with trackers');
@@ -140,6 +166,34 @@ export default class MetricsDataManager {
      */
     generateSessionId() {
         return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    /**
+     * Initialize user information
+     */
+    initializeUserInformation() {
+        try {
+            const browserInfo = this.getBrowserInfo();
+            const networkInfo = this.getNetworkInfo();
+
+            this.metrics.user = {
+                user_agent: navigator.userAgent,
+                browser_name: browserInfo.name,
+                browser_version: browserInfo.version,
+                platform: navigator.platform,
+                language: navigator.language,
+                screen_resolution: `${screen.width}x${screen.height}`,
+                viewport_size: `${window.innerWidth}x${window.innerHeight}`,
+                connection_type: networkInfo.effectiveType || 'unknown',
+                connection_speed: networkInfo.downlink ? `${networkInfo.downlink} Mbps` : 'unknown',
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                timestamp: Date.now()
+            };
+
+            console.log('User information initialized');
+        } catch (error) {
+            console.error('Error initializing user information:', error);
+        }
     }
 
     /**
@@ -163,7 +217,6 @@ export default class MetricsDataManager {
             this.metrics.session.session_duration =
                 (this.metrics.session.current_time - this.metrics.session.start_time) / 1000;
 
-            console.log(`Metrics updated for category: ${category}`);
         } catch (error) {
             console.error(`Error updating metrics for category ${category}:`, error);
         }
@@ -245,11 +298,14 @@ export default class MetricsDataManager {
                 // Segment metrics
                 const segmentMetrics = pt.getSegmentMetrics();
                 this.updateMetrics('segments', segmentMetrics);
-            }
 
-            // Collect from BitrateMonitor
-            if (this.trackerInstances.bitrateMonitor) {
-                const bitrateMetrics = this.trackerInstances.bitrateMonitor.getBitrateMetrics();
+                // Bitrate metrics
+                const bitrateMetrics = pt.getBitrateMetrics();
+                // Map average_bitrate to avg_bitrate_played for consistency
+                if (bitrateMetrics.average_bitrate) {
+                    bitrateMetrics.avg_bitrate_played = bitrateMetrics.average_bitrate;
+                }
+                console.log('Collecting bitrate metrics:', bitrateMetrics);
                 this.updateMetrics('bitrate', bitrateMetrics);
             }
 
@@ -263,6 +319,14 @@ export default class MetricsDataManager {
             if (this.trackerInstances.dataConsumptionTracker) {
                 const dataMetrics = this.trackerInstances.dataConsumptionTracker.getDataMetrics();
                 this.updateMetrics('data', dataMetrics);
+            }
+
+            // Collect bandwidth metrics from PerformanceTracker
+            if (this.trackerInstances.performanceTracker && this.trackerInstances.performanceTracker.getBandwidthMetrics) {
+                const bandwidthMetrics = this.trackerInstances.performanceTracker.getBandwidthMetrics();
+                if (bandwidthMetrics) {
+                    this.updateMetrics('bandwidth', bandwidthMetrics);
+                }
             }
 
         } catch (error) {
@@ -310,7 +374,6 @@ export default class MetricsDataManager {
                     rebuffer_ratio: snapshot.rebuffering.rebuffer_ratio,
 
                     // Playback metrics
-                    total_playback_time: snapshot.playback.total_playback_time,
 
                     // Frame metrics
                     dropped_frames: snapshot.frames.dropped_frames,
@@ -325,7 +388,10 @@ export default class MetricsDataManager {
                     // Bitrate metrics
                     current_bitrate: snapshot.bitrate.current_bitrate,
                     avg_bitrate_played: snapshot.bitrate.avg_bitrate_played,
-                    current_bandwidth: snapshot.bitrate.current_bandwidth,
+                    max_bitrate: snapshot.bitrate.max_bitrate,
+
+                    // Bandwidth metrics
+                    current_bandwidth: snapshot.bandwidth.current_bandwidth,
 
                     // Segment metrics
                     max_segment_duration: snapshot.segments.max_segment_duration,
@@ -344,6 +410,7 @@ export default class MetricsDataManager {
                     total_segment_loaded: snapshot.segments.total_segment_loaded,
                     total_data_loaded: snapshot.data.total_data_loaded
                 },
+                user_info: snapshot.user,
                 user_agent: navigator.userAgent,
                 browser_info: this.getBrowserInfo(),
                 network_info: this.getNetworkInfo()
@@ -380,15 +447,17 @@ export default class MetricsDataManager {
             this.metrics = {
                 startup: { startup_time: null, timestamp: null },
                 rebuffering: { rebuffer_count: 0, rebuffer_duration: 0, rebuffer_ratio: 0, last_rebuffer_time: null },
-                playback: { total_playback_time: 0, watch_time: 0, playback_ratio: 0 },
+                playback: { watch_time: 0, playback_ratio: 0 },
                 frames: { dropped_frames: 0, total_frames: 0, dropped_frame_ratio: 0, last_update: null },
                 fps: { current_fps: 0, min_fps: null, max_fps: 0, avg_fps: 0 },
-                bitrate: { current_bitrate: 0, avg_bitrate_played: 0, current_bandwidth: 0, bitrate_history: [] },
+                bitrate: { current_bitrate: 0, avg_bitrate_played: 0, max_bitrate: 0, bitrate_history: [], bitrate_sum: 0, bitrate_count: 0 },
+                bandwidth: { current_bandwidth: 0, bandwidth_history: [], last_bandwidth_update: null },
                 segments: { max_segment_duration: 0, min_segment_duration: null, avg_segment_load_time: 0, min_segment_loadtime: null, max_segment_loadtime: 0, total_segment_loaded: 0, segment_load_history: [] },
                 playlist: { avg_playlist_reload_time: 0, min_playlist_reload_time: null, max_playlist_reload_time: 0, reload_count: 0, reload_history: [] },
                 errors: { error_count: 0, total_events: 0, error_percentage: 0, error_types: {}, last_error: null },
                 data: { total_data_loaded: 0, data_rate: 0, data_efficiency: 0 },
-                session: { start_time: Date.now(), current_time: null, session_duration: 0, stream_url: '', is_live: false, session_id: this.generateSessionId() }
+                session: { start_time: Date.now(), current_time: null, session_duration: 0, stream_url: '', is_live: false, session_id: this.generateSessionId() },
+                user: { user_agent: '', browser_name: '', browser_version: '', platform: '', language: '', screen_resolution: '', viewport_size: '', connection_type: '', connection_speed: '', timezone: '', timestamp: null }
             };
 
             console.log('All metrics reset for new session');
@@ -513,6 +582,22 @@ export default class MetricsDataManager {
      */
     getBitrateMetrics() {
         return { ...this.metrics.bitrate };
+    }
+
+    /**
+     * Get bandwidth metrics
+     * @returns {Object} Bandwidth metrics
+     */
+    getBandwidthMetrics() {
+        return { ...this.metrics.bandwidth };
+    }
+
+    /**
+     * Get user information
+     * @returns {Object} User information
+     */
+    getUserInformation() {
+        return { ...this.metrics.user };
     }
 
     /**
@@ -1008,7 +1093,7 @@ export default class MetricsDataManager {
 
             const requiredMetrics = [
                 'startup_time', 'rebuffer_count', 'rebuffer_duration', 'rebuffer_ratio',
-                'total_playback_time', 'dropped_frames', 'total_frames', 'dropped_frame_ratio',
+                'dropped_frames', 'total_frames', 'dropped_frame_ratio',
                 'current_fps', 'min_fps', 'max_fps', 'current_bitrate', 'avg_bitrate_played',
                 'current_bandwidth', 'max_segment_duration', 'min_segment_duration',
                 'avg_segment_load_time', 'min_segment_loadtime', 'max_segment_loadtime',

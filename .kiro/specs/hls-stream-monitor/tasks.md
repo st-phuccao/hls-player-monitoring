@@ -21,7 +21,7 @@
   - _Requirements: 2.3, 2.4, 2.5_
 
 - [x] 3. Implement accurate playback time tracking
-  - Create total_playback_time counter that excludes paused and buffering states
+  - Create watch_time counter that includes all session time
   - Add event listeners for play, pause, and buffer events to control timing
   - Implement watch_time tracking for total session duration
   - Calculate and display playback efficiency ratios

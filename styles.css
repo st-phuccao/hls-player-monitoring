@@ -458,23 +458,24 @@ body {
     position: absolute !important;
     top: var(--spacing-md) !important;
     left: var(--spacing-md) !important;
-    background: linear-gradient(135deg, var(--color-live), #ff6666);
+    background: linear-gradient(135deg, rgba(255, 68, 68, 0.7), rgba(255, 102, 102, 0.7));
     color: var(--text-primary);
-    padding: var(--spacing-sm) var(--spacing-lg);
+    padding: var(--spacing-xs) var(--spacing-md);
     border-radius: var(--radius-full);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-sm);
     font-weight: var(--font-weight-bold);
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--spacing-xs);
     animation: livePulse 1.5s infinite;
     z-index: 999 !important;
-    box-shadow: 0 0 30px rgba(255, 68, 68, 0.6);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
     text-transform: uppercase;
-    letter-spacing: 1px;
+    letter-spacing: 0.5px;
     pointer-events: auto;
+    opacity: 0.85;
 }
 
 /* Control Buttons */
@@ -541,24 +542,24 @@ body {
 
 @keyframes livePulse {
     0% {
-        opacity: 1;
+        opacity: 0.85;
         transform: scale(1);
-        box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
-        background: linear-gradient(135deg, var(--color-live), #ff6666);
+        box-shadow: 0 0 15px rgba(255, 68, 68, 0.3);
+        background: linear-gradient(135deg, rgba(255, 68, 68, 0.7), rgba(255, 102, 102, 0.7));
     }
 
     50% {
-        opacity: 0.9;
-        transform: scale(1.08);
-        box-shadow: 0 0 40px rgba(255, 68, 68, 0.8);
-        background: linear-gradient(135deg, #ff6666, #ff4444);
+        opacity: 0.75;
+        transform: scale(1.05);
+        box-shadow: 0 0 25px rgba(255, 68, 68, 0.5);
+        background: linear-gradient(135deg, rgba(255, 102, 102, 0.7), rgba(255, 68, 68, 0.7));
     }
 
     100% {
-        opacity: 1;
+        opacity: 0.85;
         transform: scale(1);
-        box-shadow: 0 0 20px rgba(255, 68, 68, 0.4);
-        background: linear-gradient(135deg, var(--color-live), #ff6666);
+        box-shadow: 0 0 15px rgba(255, 68, 68, 0.3);
+        background: linear-gradient(135deg, rgba(255, 68, 68, 0.7), rgba(255, 102, 102, 0.7));
     }
 }
 
@@ -868,9 +869,9 @@ body {
     .live-indicator {
         top: var(--spacing-sm);
         left: var(--spacing-sm);
-        padding: var(--spacing-xs) var(--spacing-md);
-        font-size: var(--font-size-sm);
-        gap: var(--spacing-xs);
+        padding: 4px var(--spacing-sm);
+        font-size: 0.7rem;
+        gap: 4px;
     }
 
     .control-buttons {
@@ -1645,20 +1646,7 @@ body {
     padding-bottom: var(--spacing-sm);
 }
 
-/* Bitrate Chart Container */
-.bitrate-chart-container {
-    height: 120px;
-    margin-top: var(--spacing-md);
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(245, 158, 11, 0.05));
-    border-radius: var(--radius-md);
-    padding: var(--spacing-sm);
-    border: 1px solid rgba(37, 99, 235, 0.1);
-}
 
-.bitrate-chart {
-    width: 100% !important;
-    height: 100% !important;
-}
 
 /* Error Details */
 .error-details {
@@ -1685,9 +1673,7 @@ body {
     background: linear-gradient(90deg, #8b5cf6, #7c3aed);
 }
 
-.bitrate-panel::before {
-    background: linear-gradient(90deg, #06b6d4, #0891b2);
-}
+
 
 .segment-panel::before {
     background: linear-gradient(90deg, #ec4899, #db2777);
@@ -2760,130 +2746,27 @@ Metrics Styles */
     }
 }
 
-/* Bitrate Metrics Styles */
-.bitrate-low {
-    color: var(--color-warning);
-    font-weight: 600;
+
+
+
+
+
+
+0%,
+100% {
+    opacity: 1;
+    transform: scale(1);
 }
 
-.bitrate-medium {
-    color: var(--color-success);
-    font-weight: 600;
+33% {
+    opacity: 0.9;
+    transform: scale(1.01);
 }
 
-.bitrate-high {
-    color: var(--color-success);
-    font-weight: 600;
-    animation: bitrateExcellent 2s ease-in-out infinite;
+66% {
+    opacity: 0.95;
+    transform: scale(1.005);
 }
-
-.bitrate-adaptive {
-    color: var(--color-primary);
-    font-weight: 600;
-    animation: bitrateAdaptive 1.5s ease-in-out infinite;
-}
-
-.bitrate-stable {
-    color: var(--color-success);
-    font-weight: 600;
-}
-
-/* Bandwidth Quality Indicators */
-.bandwidth-poor {
-    color: var(--color-error);
-    font-weight: 600;
-    animation: bandwidthPoor 2s ease-in-out infinite;
-}
-
-.bandwidth-fair {
-    color: var(--color-warning);
-    font-weight: 600;
-}
-
-.bandwidth-good {
-    color: var(--color-success);
-    font-weight: 600;
-}
-
-.bandwidth-excellent {
-    color: var(--color-success);
-    font-weight: 600;
-    animation: bandwidthExcellent 3s ease-in-out infinite;
-}
-
-/* Bitrate panel specific styling */
-#bitrateMetricsPanel {
-    border-left: 4px solid var(--color-primary);
-}
-
-#bitrateMetricsPanel .card__title i {
-    color: var(--color-primary);
-}
-
-/* Animation for excellent bitrate */
-@keyframes bitrateExcellent {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    50% {
-        opacity: 0.8;
-        transform: scale(1.02);
-    }
-}
-
-/* Animation for adaptive bitrate */
-@keyframes bitrateAdaptive {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    25% {
-        opacity: 0.7;
-    }
-
-    75% {
-        opacity: 0.9;
-    }
-}
-
-/* Animation for poor bandwidth */
-@keyframes bandwidthPoor {
-
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: 0.6;
-        color: var(--color-error);
-    }
-}
-
-/* Animation for excellent bandwidth */
-@keyframes bandwidthExcellent {
-
-    0%,
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    33% {
-        opacity: 0.9;
-        transform: scale(1.01);
-    }
-
-    66% {
-        opacity: 0.95;
-        transform: scale(1.005);
-    }
 }
 
 /* Animation for buffering status */

@@ -34,7 +34,7 @@ The HLS Stream Monitor is a professional web-based tool for comprehensive HLS st
 
 #### Acceptance Criteria
 
-1. WHEN video is playing THEN the system SHALL accumulate total_playback_time (watch time)
+1. WHEN video is playing THEN the system SHALL accumulate watch_time
 2. WHEN video is paused THEN the system SHALL pause the playback time counter
 3. WHEN video is buffering THEN the system SHALL not count buffering time as playback time
 4. WHEN playback resumes THEN the system SHALL continue accumulating playback time

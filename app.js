@@ -1,6 +1,6 @@
 import MemoryManager from './js/core/MemoryManager.js';
 import PerformanceTracker from './js/core/PerformanceTracker.js';
-import BitrateMonitor from './js/core/BitrateMonitor.js';
+
 import ErrorTracker from './js/core/ErrorTracker.js';
 import DataConsumptionTracker from './js/core/DataConsumptionTracker.js';
 import MetricsDataManager from './js/core/MetricsDataManager.js';
@@ -12,7 +12,7 @@ import {
     initializeNativeHLSFallback,
     initializeComprehensiveErrorHandling,
     integrateAllComponents,
-    createFallbackBitrateMonitor,
+
     createFallbackErrorTracker,
     createFallbackDataTracker
 } from './js/core/ComponentIntegrator.js';
@@ -28,7 +28,7 @@ const appState = {
     userAnalytics: null,
     streamAnalytics: null,
     performanceTracker: null,
-    bitrateMonitor: null,
+
     errorTracker: null,
     dataConsumptionTracker: null,
     metricsDataManager: null,
@@ -52,7 +52,7 @@ let liveStatusCheckInterval = null;
 let userAnalytics = null;
 let streamAnalytics = null;
 let performanceTracker = null;
-let bitrateMonitor = null;
+
 let errorTracker = null;
 let dataConsumptionTracker = null;
 let metricsDataManager = null;
@@ -95,9 +95,7 @@ function setAppState(key, value) {
         case 'performanceTracker':
             performanceTracker = value;
             break;
-        case 'bitrateMonitor':
-            bitrateMonitor = value;
-            break;
+
         case 'errorTracker':
             errorTracker = value;
             break;
@@ -200,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Initialize components with comprehensive error handling
         initializePerformanceTracker();
-        initializeBitrateMonitor();
+
         initializeErrorTracker();
         initializeDataConsumptionTracker();
         initializeMetricsDataManager();
@@ -208,12 +206,15 @@ document.addEventListener('DOMContentLoaded', function () {
         initializeUserAnalytics();
         initializeDashboard();
 
+        // Initialize professional dashboard first
+        initializeProfessionalDashboard();
+
         // Integrate all components after initialization
         setTimeout(() => {
             try {
                 const components = {
                     performanceTracker,
-                    bitrateMonitor,
+
                     errorTracker,
                     dataConsumptionTracker,
                     metricsDataManager,
@@ -231,11 +232,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (performanceTracker) {
             performanceTracker.createSegmentPanel();
         }
-
-        // Initialize professional dashboard after all other components are ready
-        setTimeout(() => {
-            initializeProfessionalDashboard();
-        }, 5000);
 
         initializePerformanceMonitoring();
         initializeMemoryCleanup();
@@ -267,10 +263,7 @@ window.addEventListener('beforeunload', function () {
             streamAnalytics.stopMonitoring();
             setAppState('streamAnalytics', null);
         }
-        if (bitrateMonitor) {
-            bitrateMonitor.cleanup();
-            setAppState('bitrateMonitor', null);
-        }
+
         if (errorTracker) {
             errorTracker.cleanup();
             setAppState('errorTracker', null);
@@ -299,7 +292,7 @@ window.addEventListener('beforeunload', function () {
 // Old checkTimingAPISupport function removed - now using ComponentIntegrator module
 
 // All old local functions removed - now using ComponentIntegrator module for:
-// - createFallbackBitrateMonitor
+
 // - createFallbackErrorTracker  
 // - createFallbackDataTracker
 // - initializeComprehensiveErrorHandling
@@ -308,17 +301,44 @@ window.addEventListener('beforeunload', function () {
 // - testIntegrationWithNetworkConditions
 
 /**
+ * Reorder dashboard cards according to importance
+ * Order: Performance Overview -> User Information -> Error Tracking -> Network Metrics -> Data Consumption -> Frame Performance -> Segment Performance -> Metrics Export
+ */
+function reorderDashboardCards() {
+    try {
+        const dashboardGrid = document.querySelector('.dashboard__grid');
+        if (!dashboardGrid) return;
+
+        // Move Network Metrics card to position 4 (after Error Tracking)
+        const networkCard = document.getElementById('networkMetricsCard');
+        const dataCard = document.getElementById('dataConsumptionPanel');
+
+        if (networkCard && dataCard) {
+            // Insert Network Metrics before Data Consumption
+            dashboardGrid.insertBefore(networkCard, dataCard);
+            console.log('Network Metrics card moved to correct position');
+        }
+
+        console.log('Dashboard cards reordered according to importance');
+    } catch (error) {
+        console.error('Error reordering dashboard cards:', error);
+    }
+}
+
+/**
  * Initialize Performance Tracker
  */
 function initializePerformanceTracker() {
     try {
         setAppState('performanceTracker', new PerformanceTracker());
 
-        // Create the startup panel immediately so users can see it's ready
-        performanceTracker.createStartupPanel();
+        // Create the overview panel immediately so users can see it's ready
+        performanceTracker.createOverviewPanel();
 
-        // Create the rebuffering panel immediately so users can see it's ready
-        performanceTracker.createRebufferPanel();
+        // Reorder dashboard cards according to importance
+        setTimeout(() => {
+            reorderDashboardCards();
+        }, 3000);
 
 
 
@@ -332,34 +352,7 @@ function initializePerformanceTracker() {
     }
 }
 
-/**
- * Initialize Bitrate Monitor with comprehensive error handling
- */
-function initializeBitrateMonitor() {
-    try {
-        setAppState('bitrateMonitor', new BitrateMonitor());
 
-        // Verify bitrate monitor functionality
-        if (bitrateMonitor && typeof bitrateMonitor.getBitrateMetrics === 'function') {
-            console.log('Bitrate monitor initialized successfully with full functionality');
-        } else {
-            throw new Error('Bitrate monitor missing required methods');
-        }
-    } catch (error) {
-        console.error('Failed to initialize bitrate monitor:', error);
-
-        // Create fallback bitrate monitor
-        try {
-            const fallbackBitrateMonitor = createFallbackBitrateMonitor();
-            setAppState('bitrateMonitor', fallbackBitrateMonitor);
-            console.log('Fallback bitrate monitor initialized');
-            showGlobalMessage('Bitrate monitoring running in limited mode', 'warning');
-        } catch (fallbackError) {
-            console.error('Failed to create fallback bitrate monitor:', fallbackError);
-            showGlobalError('Failed to initialize bitrate monitoring. Some metrics may not be available.');
-        }
-    }
-}
 
 /**
  * Initialize Error Tracker with comprehensive error handling
@@ -431,7 +424,7 @@ function initializeMetricsDataManager() {
             if (metricsDataManager) {
                 metricsDataManager.initialize({
                     performanceTracker: performanceTracker,
-                    bitrateMonitor: bitrateMonitor,
+
                     errorTracker: errorTracker,
                     dataConsumptionTracker: dataConsumptionTracker
                 });
@@ -539,6 +532,21 @@ function initializeMetricsDataManager() {
                 window.videoElement = videoElement;
                 window.performanceTracker = performanceTracker;
 
+                // Debug methods for bitrate tracking
+                window.debugBitrateTracking = function () {
+                    if (performanceTracker) {
+                        performanceTracker.debugBitrateTracking();
+                    }
+                };
+
+                window.testBitrateUpdate = function (bitrate = 2000000) {
+                    if (performanceTracker) {
+                        console.log('Testing bitrate update with:', bitrate);
+                        performanceTracker.updateBitrateMetrics(bitrate);
+                        performanceTracker.updateRebufferDisplay();
+                    }
+                };
+
                 // Create export panel in the dashboard
                 createMetricsExportPanel();
 
@@ -645,18 +653,26 @@ function initializeHLSPlayer() {
                 updatePlayPauseButton();
 
                 // Integrate all tracking components when video starts playing
-                const components = { hlsPlayer, bitrateMonitor, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
+                const components = { hlsPlayer, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
                 integrateTrackingComponents('play', components);
 
                 // Start startup time measurement when play() is called
                 if (performanceTracker) {
                     performanceTracker.startStartupMeasurement();
+
+                    // Attach video element FIRST before starting watch time
+                    performanceTracker.attachVideoElement(videoElement);
+
+                    // Now start watch time with video element attached
                     performanceTracker.startWatchTime();
 
-                    // Attach video element for event-based rebuffer detection and frame statistics
-                    performanceTracker.attachVideoElement(videoElement);
                     performanceTracker.startFrameStatsMonitoring();
-                    performanceTracker.startFPSMonitoring();
+                    performanceTracker.startHybridFPSMonitoring();
+
+                    // Connect HLS instance for bitrate and bandwidth tracking
+                    if (hlsPlayer) {
+                        performanceTracker.setHLSInstance(hlsPlayer);
+                    }
                 }
 
                 // Update metrics data manager with stream URL
@@ -675,7 +691,7 @@ function initializeHLSPlayer() {
                 updatePlayPauseButton();
 
                 // Integrate all tracking components when video is actually playing
-                const components = { hlsPlayer, bitrateMonitor, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
+                const components = { hlsPlayer, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
                 integrateTrackingComponents('playing', components);
 
                 // Record first frame rendering for startup time calculation
@@ -695,7 +711,7 @@ function initializeHLSPlayer() {
                         performanceTracker.startFrameStatsMonitoring();
                     }
                     if (!performanceTracker.fpsAnimationFrame) {
-                        performanceTracker.startFPSMonitoring();
+                        performanceTracker.startHybridFPSMonitoring();
                     }
                 }
 
@@ -716,10 +732,7 @@ function initializeHLSPlayer() {
         videoElement.addEventListener('waiting', function () {
             try {
                 console.log('Video waiting event - tracked by PerformanceTracker');
-                // Integrate error tracking for buffering events
-                if (errorTracker) {
-                    errorTracker.incrementTotalEvents();
-                }
+                // Buffering events are now tracked via network requests
             } catch (error) {
                 console.error('Error in video waiting event handler:', error);
                 handleVideoEventError('waiting', error, errorTracker, showGlobalMessage);
@@ -729,10 +742,7 @@ function initializeHLSPlayer() {
         videoElement.addEventListener('canplay', function () {
             try {
                 console.log('Video canplay event - tracked by PerformanceTracker');
-                // Integrate error tracking for buffer resume events
-                if (errorTracker) {
-                    errorTracker.incrementTotalEvents();
-                }
+                // Buffer resume events are now tracked via network requests
             } catch (error) {
                 console.error('Error in video canplay event handler:', error);
                 handleVideoEventError('canplay', error, errorTracker, showGlobalMessage);
@@ -760,7 +770,7 @@ function initializeHLSPlayer() {
 
 
                 // Integrate tracking components for pause event
-                const components = { hlsPlayer, bitrateMonitor, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
+                const components = { hlsPlayer, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
                 integrateTrackingComponents('pause', components);
             } catch (error) {
                 console.error('Error in video pause event handler:', error);
@@ -780,7 +790,7 @@ function initializeHLSPlayer() {
                 }
 
                 // Integrate tracking components for end event
-                const components = { hlsPlayer, bitrateMonitor, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
+                const components = { hlsPlayer, errorTracker, dataConsumptionTracker, performanceTracker, metricsDataManager, isLiveStream };
                 integrateTrackingComponents('ended', components);
             } catch (error) {
                 console.error('Error in video ended event handler:', error);
@@ -1986,6 +1996,7 @@ function loadHLSStream(url) {
             performanceTracker.resetStartupMetrics();
             performanceTracker.resetRebufferMetrics();
             performanceTracker.resetFrameMetrics();
+            performanceTracker.resetBitrateAndBufferMetrics();
         }
 
         if (Hls.isSupported() && window.Hls) {
@@ -2023,22 +2034,17 @@ function loadHLSStream(url) {
                     // Continue without analytics
                 }
 
-                // Initialize BitrateMonitor with HLS instance
-                try {
-                    if (bitrateMonitor) {
-                        bitrateMonitor.resetMetrics();
-                        bitrateMonitor.setHLSInstance(hlsPlayer);
-                    }
-                } catch (bitrateError) {
-                    console.warn('Failed to initialize bitrate monitoring:', bitrateError);
-                    // Continue without bitrate monitoring
-                }
 
                 // Initialize ErrorTracker with HLS instance
                 try {
                     if (errorTracker) {
                         errorTracker.resetErrorMetrics();
                         errorTracker.setHLSInstance(hlsPlayer);
+
+                        // Set DataConsumptionTracker reference for total requests count
+                        if (dataConsumptionTracker) {
+                            errorTracker.setDataConsumptionTracker(dataConsumptionTracker);
+                        }
                     }
                 } catch (errorTrackerError) {
                     console.warn('Failed to initialize error tracking:', errorTrackerError);
@@ -2763,6 +2769,7 @@ function resetStreamState() {
             performanceTracker.resetStartupMetrics();
             performanceTracker.resetRebufferMetrics();
             performanceTracker.resetFrameMetrics();
+            performanceTracker.resetBitrateAndBufferMetrics();
         }
 
         if (videoElement) {
@@ -3929,49 +3936,8 @@ class StreamAnalytics {
      * Update the UI with current stream metrics
      */
     updateUI() {
-        // Update bitrate info
-        const bitrateElement = document.getElementById('bitrateInfo');
-        if (bitrateElement) {
-            const bitrate = this.metrics.stream.currentBitrate;
-            if (bitrate > 0) {
-                // Convert to Mbps for display
-                const mbps = (bitrate / 1000000).toFixed(2);
-                bitrateElement.textContent = `${mbps} Mbps`;
-            } else {
-                bitrateElement.textContent = '-';
-            }
-        }
-
-        // Update resolution info
-        const resolutionElement = document.getElementById('resolutionInfo');
-        if (resolutionElement) {
-            const resolution = this.metrics.stream.resolution;
-            resolutionElement.textContent = resolution || '-';
-        }
-
-        // Update frame rate info
-        const frameRateElement = document.getElementById('frameRateInfo');
-        if (frameRateElement) {
-            const frameRate = this.metrics.stream.frameRate;
-            if (frameRate > 0) {
-                frameRateElement.textContent = `${frameRate} fps`;
-            } else {
-                frameRateElement.textContent = '-';
-            }
-        }
-
-        // Update load time info
-        const loadTimeElement = document.getElementById('loadTimeInfo');
-        if (loadTimeElement) {
-            const loadTime = this.metrics.stream.loadTime;
-            if (loadTime > 0) {
-                loadTimeElement.textContent = `${(loadTime / 1000).toFixed(2)}s`;
-            } else {
-                loadTimeElement.textContent = '-';
-            }
-        }
-
-
+        // Stream Performance card removed - UI updates now handled by Overview panel
+        console.log('StreamAnalytics updateUI - Stream Performance card removed');
     }
 
 
@@ -4624,7 +4590,7 @@ class Dashboard {
         this.updateInterval = null;
         this.isUpdating = false;
         this.lastUpdateTime = 0;
-        this.updateFrequency = 1000; // Update every 1 second
+        this.updateFrequency = 20000; // Update every 20 seconds
 
         // Cache DOM elements for better performance
         this.elements = {
@@ -4634,11 +4600,7 @@ class Dashboard {
             screenInfo: document.getElementById('screenInfo'),
             connectionInfo: document.getElementById('connectionInfo'),
 
-            // Stream Performance elements
-            bitrateInfo: document.getElementById('bitrateInfo'),
-            resolutionInfo: document.getElementById('resolutionInfo'),
-            frameRateInfo: document.getElementById('frameRateInfo'),
-            loadTimeInfo: document.getElementById('loadTimeInfo'),
+
 
 
         };
@@ -4649,12 +4611,7 @@ class Dashboard {
         console.log('Dashboard initialized');
 
         // Test elements availability
-        console.log('Testing dashboard elements:', {
-            bitrateInfo: this.elements.bitrateInfo ? 'found' : 'missing',
-            resolutionInfo: this.elements.resolutionInfo ? 'found' : 'missing',
-            frameRateInfo: this.elements.frameRateInfo ? 'found' : 'missing',
-            loadTimeInfo: this.elements.loadTimeInfo ? 'found' : 'missing'
-        });
+        console.log('Testing dashboard elements - Stream Performance elements removed');
     }
 
     /**
@@ -4709,13 +4666,13 @@ class Dashboard {
         const currentTime = performance.now();
 
         // Throttle updates to prevent excessive DOM manipulation
-        if (currentTime - this.lastUpdateTime < this.updateFrequency - 50) {
+        if (currentTime - this.lastUpdateTime < this.updateFrequency - 100) {
             return;
         }
 
         try {
             // Update user information (less frequent updates needed)
-            if (currentTime - this.lastUpdateTime > 5000) { // Update every 5 seconds
+            if (currentTime - this.lastUpdateTime > 20000) { // Update every 20 seconds
                 this.updateUserInfo();
             }
 
@@ -4817,12 +4774,7 @@ class Dashboard {
 
                 // Debug logs (commented out to reduce console spam)
                 // console.log('Stream metrics:', metrics);
-                // console.log('Elements available:', {
-                //     bitrateInfo: !!this.elements.bitrateInfo,
-                //     resolutionInfo: !!this.elements.resolutionInfo,
-                //     frameRateInfo: !!this.elements.frameRateInfo,
-                //     loadTimeInfo: !!this.elements.loadTimeInfo
-                // });
+                // Stream Performance elements removed
 
                 // Mark card as updating
                 if (streamCard) streamCard.classList.add('card--updating');
@@ -4830,35 +4782,7 @@ class Dashboard {
                 // Batch all DOM updates together
                 const updates = [];
 
-                // Update bitrate information
-                if (this.elements.bitrateInfo) {
-                    const bitrateText = metrics.currentBitrate ?
-                        `${(metrics.currentBitrate / 1000).toFixed(1)} kbps` :
-                        'Loading...';
-                    updates.push(() => this.updateElementWithAnimation(this.elements.bitrateInfo, bitrateText));
-                }
-
-                // Update resolution information
-                if (this.elements.resolutionInfo) {
-                    const resolutionText = metrics.resolution || 'Loading...';
-                    updates.push(() => this.updateElementWithAnimation(this.elements.resolutionInfo, resolutionText));
-                }
-
-                // Update frame rate information
-                if (this.elements.frameRateInfo) {
-                    const frameRateText = metrics.frameRate ?
-                        `${metrics.frameRate} fps` :
-                        'Loading...';
-                    updates.push(() => this.updateElementWithAnimation(this.elements.frameRateInfo, frameRateText));
-                }
-
-                // Update load time information
-                if (this.elements.loadTimeInfo) {
-                    const loadTimeText = metrics.loadTime ?
-                        `${(metrics.loadTime / 1000).toFixed(2)}s` :
-                        'Loading...';
-                    updates.push(() => this.updateElementWithAnimation(this.elements.loadTimeInfo, loadTimeText));
-                }
+                // Stream Performance card removed - metrics now in Overview panel
 
                 // Execute all updates in a single frame
                 updates.forEach(update => update());
@@ -4932,7 +4856,6 @@ class Dashboard {
         if (!streamAnalytics || !userAnalytics) return;
 
         try {
-            const performanceStats = streamAnalytics.getPerformanceStats();
             const userAnalyticsData = userAnalytics.getAnalyticsData();
 
             // Get bandwidth data
@@ -4943,15 +4866,6 @@ class Dashboard {
 
             // Update network chart
             this.chartManager.updateNetworkChart(bandwidthMbps);
-
-            // Get buffer health data
-            let bufferHealthPercentage = 0;
-            if (performanceStats.bufferHealth !== undefined) {
-                bufferHealthPercentage = performanceStats.bufferHealth * 100;
-            }
-
-
-
         } catch (error) {
             console.error('Error updating charts:', error);
         }
@@ -4988,19 +4902,7 @@ class Dashboard {
      * Test function to manually update stream info
      */
     testStreamInfoUpdate() {
-        console.log('Testing stream info update...');
-        if (this.elements.bitrateInfo) {
-            this.updateElementWithAnimation(this.elements.bitrateInfo, 'Test: 1000 kbps');
-        }
-        if (this.elements.resolutionInfo) {
-            this.updateElementWithAnimation(this.elements.resolutionInfo, 'Test: 1920x1080');
-        }
-        if (this.elements.frameRateInfo) {
-            this.updateElementWithAnimation(this.elements.frameRateInfo, 'Test: 30 fps');
-        }
-        if (this.elements.loadTimeInfo) {
-            this.updateElementWithAnimation(this.elements.loadTimeInfo, 'Test: 2.5s');
-        }
+        console.log('Stream Performance card removed - test method deprecated');
     }
 
     /**
@@ -5022,10 +4924,7 @@ class Dashboard {
             osInfo: 'Loading...',
             screenInfo: 'Loading...',
             connectionInfo: 'Loading...',
-            bitrateInfo: '-',
-            resolutionInfo: '-',
-            frameRateInfo: '-',
-            loadTimeInfo: '-',
+
             bufferErrors: '0',
             networkErrors: '0',
             latencyInfo: '-',
@@ -5118,8 +5017,7 @@ function initializeFallbackDashboard() {
             { id: 'osInfo', value: 'Dashboard Error' },
             { id: 'screenInfo', value: 'Dashboard Error' },
             { id: 'connectionInfo', value: 'Dashboard Error' },
-            { id: 'bitrateInfo', value: 'N/A' },
-            { id: 'resolutionInfo', value: 'N/A' },
+
             { id: 'frameRateInfo', value: 'N/A' },
             { id: 'loadTimeInfo', value: 'N/A' },
             { id: 'bufferErrors', value: 'N/A' },
@@ -5419,8 +5317,6 @@ class ChartManager {
                 }
             }
         });
-
-        console.log('Network chart created');
     }
 
 
