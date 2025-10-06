@@ -790,6 +790,63 @@ body {
     transform: scale(1.02);
 }
 
+/* Large Chart Container for Bandwidth Section */
+.chart-container--large {
+    height: 400px;
+    padding: var(--spacing-lg);
+}
+
+/* Bandwidth Chart Section */
+.bandwidth-chart-section {
+    margin-top: var(--spacing-2xl);
+    padding: var(--spacing-xl) 0;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.02), rgba(245, 158, 11, 0.02));
+    border-top: 1px solid var(--border-primary);
+}
+
+.bandwidth-chart-card {
+    max-width: none;
+    margin: 0;
+}
+
+.bandwidth-chart-card .card__header {
+    text-align: center;
+    padding-bottom: var(--spacing-lg);
+}
+
+.bandwidth-chart-card .card__title {
+    font-size: var(--font-size-xl);
+    color: var(--color-primary);
+}
+
+/* FPS Chart Section */
+.fps-chart-section {
+    margin-top: var(--spacing-xl);
+    padding: var(--spacing-xl) 0;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.02), rgba(245, 158, 11, 0.02));
+    border-top: 1px solid var(--border-primary);
+}
+
+.fps-chart-card {
+    max-width: none;
+    margin: 0;
+}
+
+.fps-chart-card .card__header {
+    text-align: center;
+    padding-bottom: var(--spacing-lg);
+}
+
+.fps-chart-card .card__title {
+    font-size: var(--font-size-xl);
+    color: var(--color-success);
+}
+
+/* Hide Network Metrics Panel */
+#networkMetricsCard {
+    display: none;
+}
+
 /* Footer */
 .footer {
     background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));

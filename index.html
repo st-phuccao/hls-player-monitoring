@@ -12,7 +12,7 @@
     <title>HLS Player</title>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/webp" href="favicon.webp">
+    <link rel="icon" type="image/webp" href="assets/favicon.webp">
 
     <!-- CSS -->
     <link rel="stylesheet" href="styles.css">
@@ -33,7 +33,7 @@
     <header class="header">
         <div class="container">
             <h1 class="header__title">
-                <img src="logo-white.svg" alt="HLS Stream Monitor Logo" class="header__logo">
+                <img src="assets/logo-white.svg" alt="HLS Stream Monitor Logo" class="header__logo">
 
             </h1>
             <div class="header__status">
@@ -167,12 +167,69 @@
                             </h2>
                         </header>
                         <div class="card__content">
-                            <div class="chart-container">
-                                <canvas id="networkChart" aria-label="Network performance chart"></canvas>
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <span class="info-item__label">Connection Type:</span>
+                                    <span class="info-item__value" id="connectionTypeValue">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Effective Type:</span>
+                                    <span class="info-item__value" id="effectiveTypeValue">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Downlink:</span>
+                                    <span class="info-item__value" id="downlinkValue">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">RTT:</span>
+                                    <span class="info-item__value" id="rttValue">-</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-item__label">Current Bandwidth:</span>
+                                    <span class="info-item__value" id="currentNetworkBandwidth">-</span>
+                                </div>
                             </div>
                         </div>
                     </article>
 
+                </div>
+            </section>
+
+            <!-- Bandwidth Chart Section -->
+            <section class="bandwidth-chart-section">
+                <div class="container">
+                    <article class="card bandwidth-chart-card">
+                        <header class="card__header">
+                            <h2 class="card__title">
+                                <i class="fas fa-chart-line"></i>
+                                Bandwidth Performance
+                            </h2>
+                        </header>
+                        <div class="card__content">
+                            <div class="chart-container chart-container--large">
+                                <canvas id="networkChart" aria-label="Network performance chart"></canvas>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <!-- FPS Chart Section -->
+            <section class="fps-chart-section">
+                <div class="container">
+                    <article class="card fps-chart-card">
+                        <header class="card__header">
+                            <h2 class="card__title">
+                                <i class="fas fa-tachometer-alt"></i>
+                                FPS Performance
+                            </h2>
+                        </header>
+                        <div class="card__content">
+                            <div class="chart-container chart-container--large">
+                                <canvas id="fpsChart" aria-label="FPS performance chart"></canvas>
+                            </div>
+                        </div>
+                    </article>
                 </div>
             </section>
         </div>

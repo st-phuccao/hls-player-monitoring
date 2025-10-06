@@ -4502,6 +4502,46 @@ class UserAnalytics {
 
             connectionInfoElement.textContent = connectionText;
         }
+
+        // Update Network Metrics panel fields
+        this.updateNetworkMetricsPanel();
+    }
+
+    /**
+     * Update Network Metrics panel with detailed information
+     */
+    updateNetworkMetricsPanel() {
+        // Connection Type
+        const connectionTypeElement = document.getElementById('connectionTypeValue');
+        if (connectionTypeElement) {
+            connectionTypeElement.textContent = this.data.network.connectionType || '-';
+        }
+
+        // Effective Type
+        const effectiveTypeElement = document.getElementById('effectiveTypeValue');
+        if (effectiveTypeElement) {
+            effectiveTypeElement.textContent = this.data.network.effectiveType || '-';
+        }
+
+        // Downlink
+        const downlinkElement = document.getElementById('downlinkValue');
+        if (downlinkElement) {
+            const downlink = this.data.network.downlink || this.data.network.estimatedBandwidth;
+            downlinkElement.textContent = downlink ? `${downlink} Mbps` : '-';
+        }
+
+        // RTT
+        const rttElement = document.getElementById('rttValue');
+        if (rttElement) {
+            rttElement.textContent = this.data.network.rtt ? `${this.data.network.rtt} ms` : '-';
+        }
+
+        // Current Bandwidth (from performance tracker if available)
+        const currentBandwidthElement = document.getElementById('currentNetworkBandwidth');
+        if (currentBandwidthElement && window.performanceTracker) {
+            const currentBandwidth = window.performanceTracker.metrics.bandwidth.current_bandwidth;
+            currentBandwidthElement.textContent = currentBandwidth > 0 ? `${currentBandwidth.toFixed(1)} Mbps` : '-';
+        }
     }
 
     /**
@@ -4866,6 +4906,15 @@ class Dashboard {
 
             // Update network chart
             this.chartManager.updateNetworkChart(bandwidthMbps);
+
+            // Get FPS data from PerformanceTracker
+            let currentFPS = 0;
+            if (window.performanceTracker && window.performanceTracker.metrics.fps) {
+                currentFPS = window.performanceTracker.metrics.fps.current_fps || 0;
+            }
+
+            // Update FPS chart
+            this.chartManager.updateFPSChart(currentFPS);
         } catch (error) {
             console.error('Error updating charts:', error);
         }
@@ -5156,13 +5205,17 @@ class ChartManager {
                 data: [],
                 maxDataPoints: 30
             },
+            fps: {
+                labels: [],
+                data: [],
+                maxDataPoints: 30
+            },
             bufferHealth: {
                 value: 0
             }
         };
 
         this.isInitialized = false;
-        console.log('ChartManager initialized');
     }
 
     /**
@@ -5177,6 +5230,7 @@ class ChartManager {
 
         try {
             this.createNetworkChart();
+            this.createFPSChart();
             this.isInitialized = true;
             console.log('Charts initialized successfully');
         } catch (error) {
@@ -5319,7 +5373,136 @@ class ChartManager {
         });
     }
 
+    /**
+     * Create FPS performance chart
+     */
+    createFPSChart() {
+        const canvas = document.getElementById('fpsChart');
+        if (!canvas) {
+            console.warn('FPS chart canvas not found');
+            return;
+        }
 
+        const ctx = canvas.getContext('2d');
+
+        this.charts.fps = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: this.chartData.fps.labels,
+                datasets: [
+                    {
+                        label: 'FPS',
+                        data: this.chartData.fps.data,
+                        borderColor: 'rgb(16, 185, 129)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: 'rgb(16, 185, 129)',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 750,
+                    easing: 'easeInOutQuart'
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#f8fafc',
+                            font: {
+                                size: 12,
+                                weight: '500'
+                            },
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: 'rgba(16, 185, 129, 0.3)',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        callbacks: {
+                            label: function (context) {
+                                return `FPS: ${context.parsed.y.toFixed(1)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time',
+                            color: '#64748b',
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            }
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 10
+                            },
+                            maxTicksLimit: 8
+                        },
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)',
+                            drawBorder: false
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'FPS',
+                            color: 'rgb(16, 185, 129)',
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            }
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 10
+                            },
+                            callback: function (value) {
+                                return value.toFixed(0) + ' fps';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)',
+                            drawBorder: false
+                        },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
 
     /**
      * Update network chart with new data
@@ -5351,7 +5534,35 @@ class ChartManager {
         this.charts.network.update('none'); // No animation for real-time updates
     }
 
+    /**
+     * Update FPS chart with new data
+     */
+    updateFPSChart(fps) {
+        if (!this.charts.fps || !this.isInitialized || typeof Chart === 'undefined') return;
 
+        const now = new Date();
+        const timeLabel = now.toLocaleTimeString('en-US', {
+            hour12: false,
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        // Add new data points
+        this.chartData.fps.labels.push(timeLabel);
+        this.chartData.fps.data.push(fps || 0);
+
+        // Remove old data points if we exceed max
+        if (this.chartData.fps.labels.length > this.chartData.fps.maxDataPoints) {
+            this.chartData.fps.labels.shift();
+            this.chartData.fps.data.shift();
+        }
+
+        // Update chart
+        this.charts.fps.data.labels = this.chartData.fps.labels;
+        this.charts.fps.data.datasets[0].data = this.chartData.fps.data;
+
+        this.charts.fps.update('none'); // No animation for real-time updates
+    }
 
     /**
      * Reset all charts
@@ -5360,6 +5571,8 @@ class ChartManager {
         // Clear data
         this.chartData.bandwidth.labels = [];
         this.chartData.bandwidth.data = [];
+        this.chartData.fps.labels = [];
+        this.chartData.fps.data = [];
 
         // Update charts
         if (this.charts.network) {
@@ -5368,7 +5581,11 @@ class ChartManager {
             this.charts.network.update();
         }
 
-
+        if (this.charts.fps) {
+            this.charts.fps.data.labels = [];
+            this.charts.fps.data.datasets[0].data = [];
+            this.charts.fps.update();
+        }
 
         console.log('Charts reset');
     }
