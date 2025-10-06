@@ -2524,48 +2524,34 @@ export default class PerformanceTracker {
                     </h2>
                 </header>
                 <div class="card__content">
-                    <div class="segment-metrics-grid">
-                        <div class="metric-section">
-                            <h3 class="metric-section__title">Segment Durations</h3>
-                            <div class="info-grid">
-                                <div class="info-item">
-                                    <span class="info-item__label">Max Duration:</span>
-                                    <span class="info-item__value" id="maxSegmentDurationValue">0.000 s</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-item__label">Min Duration:</span>
-                                    <span class="info-item__value" id="minSegmentDurationValue">-</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-item__label">Avg Duration:</span>
-                                    <span class="info-item__value" id="avgSegmentDurationValue">0.000 s</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-item__label">Segment Count:</span>
-                                    <span class="info-item__value" id="segmentCountValue">0</span>
-                                </div>
-                            </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-item__label">Max Duration:</span>
+                            <span class="info-item__value" id="maxSegmentDurationValue">0.000 s</span>
                         </div>
-                        <div class="metric-section">
-                            <h3 class="metric-section__title">Load Performance</h3>
-                            <div class="info-grid">
-                                <div class="info-item">
-                                    <span class="info-item__label">Avg Load Time:</span>
-                                    <span class="info-item__value" id="avgSegmentLoadTimeValue">0.00 ms</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-item__label">Min Load Time:</span>
-                                    <span class="info-item__value" id="minSegmentLoadTimeValue">-</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-item__label">Max Load Time:</span>
-                                    <span class="info-item__value" id="maxSegmentLoadTimeValue">0.00 ms</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="info-item__label">Total Loaded:</span>
-                                    <span class="info-item__value" id="totalSegmentLoadedValue">0</span>
-                                </div>
-                            </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Min Duration:</span>
+                            <span class="info-item__value" id="minSegmentDurationValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Avg Duration:</span>
+                            <span class="info-item__value" id="avgSegmentDurationValue">0.000 s</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Segment Count:</span>
+                            <span class="info-item__value" id="segmentCountValue">0</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Avg Load Time:</span>
+                            <span class="info-item__value" id="avgSegmentLoadTimeValue">0.00 ms</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Min Load Time:</span>
+                            <span class="info-item__value" id="minSegmentLoadTimeValue">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-item__label">Max Load Time:</span>
+                            <span class="info-item__value" id="maxSegmentLoadTimeValue">0.00 ms</span>
                         </div>
                     </div>
                 </div>
