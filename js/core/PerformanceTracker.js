@@ -28,11 +28,9 @@ export default class PerformanceTracker {
             },
             bitrate: {
                 current_bitrate: 0,
-                average_bitrate: 0,
                 max_bitrate: 0,
                 bitrate_history: [],
-                bitrate_sum: 0,
-                bitrate_count: 0
+                average_bitrate: 0
             },
             bandwidth: {
                 current_bandwidth: 0,
@@ -96,6 +94,7 @@ export default class PerformanceTracker {
         this.fpsAnimationFrame = null;
         this.fpsVideoInterval = null;
         this.segmentUpdateInterval = null;
+        this.bitrateHistoryInterval = null;
 
         // State tracking cho rebuffer logic chuẩn
         this.videoElement = null;
@@ -142,7 +141,6 @@ export default class PerformanceTracker {
                     console.log('Level switched (string event):', data);
                     if (data.level !== undefined && this.hlsInstance.levels && this.hlsInstance.levels[data.level]) {
                         const level = this.hlsInstance.levels[data.level];
-                        console.log('Updating bitrate from level switch (string):', level.bitrate);
                         this.updateBitrateMetrics(level.bitrate);
                     }
                 });
@@ -164,7 +162,6 @@ export default class PerformanceTracker {
                     console.log('Level switched event:', data);
                     if (data.level !== undefined && this.hlsInstance.levels && this.hlsInstance.levels[data.level]) {
                         const level = this.hlsInstance.levels[data.level];
-                        console.log('Updating bitrate from level switch:', level.bitrate);
                         this.updateBitrateMetrics(level.bitrate);
                     }
                 });
@@ -208,6 +205,9 @@ export default class PerformanceTracker {
             this.bitrateCheckInterval = setInterval(() => {
                 this.checkCurrentBitrate();
             }, 5000); // Check every 5 seconds
+
+            // Set up bitrate history tracking every 10 seconds
+            this.startBitrateHistoryTracking();
 
             console.log('HLS event listeners setup for bitrate/bandwidth tracking');
         } catch (error) {
@@ -366,7 +366,7 @@ export default class PerformanceTracker {
         if (!this.videoElement) return;
 
         const currentTime = this.videoElement.currentTime;
-        const now = performance.now();
+        const now = Date.now();
 
         // Kiểm tra xem currentTime có tăng không (playback progress)
         if (this.metrics.rebuffering.last_current_time !== currentTime) {
@@ -788,13 +788,14 @@ export default class PerformanceTracker {
                 this.bitrateCheckInterval = null;
             }
 
+            // Clear bitrate history interval
+            this.stopBitrateHistoryTracking();
+
             this.metrics.bitrate = {
                 current_bitrate: 0,
-                average_bitrate: 0,
                 max_bitrate: 0,
                 bitrate_history: [],
-                bitrate_sum: 0,
-                bitrate_count: 0
+                average_bitrate: 0
             };
 
             this.metrics.bandwidth = {
@@ -983,22 +984,82 @@ export default class PerformanceTracker {
                     this.metrics.bitrate.max_bitrate = currentBitrate;
                 }
 
-                // Cập nhật average bitrate
-                this.metrics.bitrate.bitrate_history.push(currentBitrate);
-                this.metrics.bitrate.bitrate_sum += currentBitrate;
-                this.metrics.bitrate.bitrate_count++;
-
-                // Giữ lại chỉ 100 giá trị gần nhất để tính average
-                if (this.metrics.bitrate.bitrate_history.length > 100) {
-                    const removed = this.metrics.bitrate.bitrate_history.shift();
-                    this.metrics.bitrate.bitrate_sum -= removed;
-                    this.metrics.bitrate.bitrate_count--;
+                // Tính average bitrate từ history
+                if (this.metrics.bitrate.bitrate_history.length > 0) {
+                    const sum = this.metrics.bitrate.bitrate_history.reduce((acc, item) => acc + (item.value * 1000000), 0);
+                    this.metrics.bitrate.average_bitrate = sum / this.metrics.bitrate.bitrate_history.length;
+                } else {
+                    this.metrics.bitrate.average_bitrate = currentBitrate;
                 }
-
-                this.metrics.bitrate.average_bitrate = this.metrics.bitrate.bitrate_sum / this.metrics.bitrate.bitrate_count;
             }
         } catch (error) {
             console.error('Error updating bitrate metrics:', error);
+        }
+    }
+
+    /**
+     * Bắt đầu tracking bitrate history mỗi 10 giây
+     */
+    startBitrateHistoryTracking() {
+        try {
+            // Clear existing interval if any
+            if (this.bitrateHistoryInterval) {
+                clearInterval(this.bitrateHistoryInterval);
+            }
+
+            // Track bitrate history every 10 seconds
+            this.bitrateHistoryInterval = setInterval(() => {
+                this.addBitrateToHistory();
+            }, 10000); // 10 seconds
+
+            console.log('Bitrate history tracking started (10s interval)');
+        } catch (error) {
+            console.error('Error starting bitrate history tracking:', error);
+        }
+    }
+
+    /**
+     * Thêm bitrate hiện tại vào history với timestamp
+     */
+    addBitrateToHistory() {
+        try {
+            if (this.metrics.bitrate.current_bitrate > 0) {
+                const bitrateInMbps = this.metrics.bitrate.current_bitrate / 1000000; // Convert to Mbps
+                const timestamp = Date.now(); // Sử dụng Date.now() thay vì performance.now()
+
+                this.metrics.bitrate.bitrate_history.push({
+                    value: bitrateInMbps,
+                    timestamp: timestamp
+                });
+
+                // Giữ lại chỉ 360 giá trị gần nhất (1 giờ với interval 10s)
+                if (this.metrics.bitrate.bitrate_history.length > 360) {
+                    this.metrics.bitrate.bitrate_history.shift();
+                }
+
+                // Cập nhật average bitrate từ history
+                const sum = this.metrics.bitrate.bitrate_history.reduce((acc, item) => acc + (item.value * 1000000), 0);
+                this.metrics.bitrate.average_bitrate = sum / this.metrics.bitrate.bitrate_history.length;
+
+                console.log(`Bitrate added to history: ${bitrateInMbps.toFixed(2)} Mbps at ${new Date(timestamp).toLocaleTimeString()}`);
+            }
+        } catch (error) {
+            console.error('Error adding bitrate to history:', error);
+        }
+    }
+
+    /**
+     * Dừng tracking bitrate history
+     */
+    stopBitrateHistoryTracking() {
+        try {
+            if (this.bitrateHistoryInterval) {
+                clearInterval(this.bitrateHistoryInterval);
+                this.bitrateHistoryInterval = null;
+                console.log('Bitrate history tracking stopped');
+            }
+        } catch (error) {
+            console.error('Error stopping bitrate history tracking:', error);
         }
     }
 
@@ -1009,7 +1070,7 @@ export default class PerformanceTracker {
         try {
             if (currentBandwidth && currentBandwidth > 0) {
                 this.metrics.bandwidth.current_bandwidth = currentBandwidth;
-                const now = performance.now();
+                const now = Date.now();
                 this.metrics.bandwidth.last_bandwidth_update = now;
 
                 // Chỉ lưu lịch sử bandwidth mỗi 10 giây
@@ -1023,8 +1084,8 @@ export default class PerformanceTracker {
                         timestamp: now
                     });
 
-                    // Giữ lại chỉ 50 giá trị gần nhất (500 giây = ~8 phút)
-                    if (this.metrics.bandwidth.bandwidth_history.length > 50) {
+                    // Giữ lại chỉ 100 giá trị gần nhất (~16 phút)
+                    if (this.metrics.bandwidth.bandwidth_history.length > 100) {
                         this.metrics.bandwidth.bandwidth_history.shift();
                     }
                 }

@@ -44,11 +44,9 @@ export default class MetricsDataManager {
             // Bitrate and Quality
             bitrate: {
                 current_bitrate: 0,
-                avg_bitrate_played: 0,
                 max_bitrate: 0,
                 bitrate_history: [],
-                bitrate_sum: 0,
-                bitrate_count: 0
+                average_bitrate: 0
             },
 
             // Bandwidth Metrics
@@ -301,10 +299,6 @@ export default class MetricsDataManager {
 
                 // Bitrate metrics
                 const bitrateMetrics = pt.getBitrateMetrics();
-                // Map average_bitrate to avg_bitrate_played for consistency
-                if (bitrateMetrics.average_bitrate) {
-                    bitrateMetrics.avg_bitrate_played = bitrateMetrics.average_bitrate;
-                }
                 console.log('Collecting bitrate metrics:', bitrateMetrics);
                 this.updateMetrics('bitrate', bitrateMetrics);
             }
@@ -387,7 +381,7 @@ export default class MetricsDataManager {
 
                     // Bitrate metrics
                     current_bitrate: snapshot.bitrate.current_bitrate,
-                    avg_bitrate_played: snapshot.bitrate.avg_bitrate_played,
+                    average_bitrate: snapshot.bitrate.average_bitrate,
                     max_bitrate: snapshot.bitrate.max_bitrate,
 
                     // Bandwidth metrics
@@ -450,7 +444,7 @@ export default class MetricsDataManager {
                 playback: { watch_time: 0, playback_ratio: 0 },
                 frames: { dropped_frames: 0, total_frames: 0, dropped_frame_ratio: 0, last_update: null },
                 fps: { current_fps: 0, min_fps: null, max_fps: 0, avg_fps: 0 },
-                bitrate: { current_bitrate: 0, avg_bitrate_played: 0, max_bitrate: 0, bitrate_history: [], bitrate_sum: 0, bitrate_count: 0 },
+                bitrate: { current_bitrate: 0, max_bitrate: 0, bitrate_history: [], average_bitrate: 0 },
                 bandwidth: { current_bandwidth: 0, bandwidth_history: [], last_bandwidth_update: null },
                 segments: { max_segment_duration: 0, min_segment_duration: null, avg_segment_load_time: 0, min_segment_loadtime: null, max_segment_loadtime: 0, total_segment_loaded: 0, segment_load_history: [] },
                 playlist: { avg_playlist_reload_time: 0, min_playlist_reload_time: null, max_playlist_reload_time: 0, reload_count: 0, reload_history: [] },
@@ -917,8 +911,6 @@ export default class MetricsDataManager {
 
             // Clean up the URL object
             setTimeout(() => URL.revokeObjectURL(url), 100);
-
-            console.log(`Metrics file downloaded: ${finalFilename}`);
         } catch (error) {
             console.error('Error downloading metrics file:', error);
         }
@@ -947,7 +939,7 @@ export default class MetricsDataManager {
                     playback_efficiency: snapshot.playback.playback_ratio,
                     frame_drop_ratio: snapshot.frames.dropped_frame_ratio,
                     average_fps: snapshot.fps.avg_fps,
-                    average_bitrate: snapshot.bitrate.avg_bitrate_played,
+                    average_bitrate: snapshot.bitrate.average_bitrate,
                     error_rate: snapshot.errors.error_percentage
                 },
                 quality_assessment: {
@@ -1094,7 +1086,7 @@ export default class MetricsDataManager {
             const requiredMetrics = [
                 'startup_time', 'rebuffer_count', 'rebuffer_duration', 'rebuffer_ratio',
                 'dropped_frames', 'total_frames', 'dropped_frame_ratio',
-                'current_fps', 'min_fps', 'max_fps', 'current_bitrate', 'avg_bitrate_played',
+                'current_fps', 'min_fps', 'max_fps', 'current_bitrate', 'average_bitrate',
                 'current_bandwidth', 'max_segment_duration', 'min_segment_duration',
                 'avg_segment_load_time', 'min_segment_loadtime', 'max_segment_loadtime',
                 'avg_playlist_reload_time', 'min_playlist_reload_time', 'max_playlist_reload_time',

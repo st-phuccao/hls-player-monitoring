@@ -35,13 +35,8 @@ export default class DataConsumptionTracker {
      */
     initializeBasicTracking() {
         try {
-            if (typeof performance === 'undefined' || typeof performance.now !== 'function') {
-                this.metrics.session_start_time = Date.now();
-                this.metrics.last_update_time = Date.now();
-            } else {
-                this.metrics.session_start_time = performance.now();
-                this.metrics.last_update_time = performance.now();
-            }
+            this.metrics.session_start_time = Date.now();
+            this.metrics.last_update_time = Date.now();
 
             this.startRealTimeUpdates();
             this.updateDataDisplay();
