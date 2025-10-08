@@ -20,6 +20,7 @@ export default class DataConsumptionTracker {
         this.realTimeUpdateInterval = null;
         this.lastFragmentTime = null;
         this.lastFragmentBytes = 0;
+        this.trackedUrls = new Set(); // Track URLs to avoid double counting
 
         console.log('DataConsumptionTracker initialized');
 
@@ -189,47 +190,52 @@ export default class DataConsumptionTracker {
 
             // Track completed fragment loads for accurate data measurement
             this.hlsInstance.on(window.Hls.Events.FRAG_LOADED, (event, data) => {
-                this.incrementTotalRequests(); // Count fragment requests
+                const url = data && data.frag ? data.frag.url : null;
+                this.incrementTotalRequests(url); // Count .ts segment requests with URL tracking
                 this.handleFragmentLoaded(event, data);
             });
 
             // Track manifest loading for complete data consumption
             this.hlsInstance.on(window.Hls.Events.MANIFEST_LOADED, (event, data) => {
-                this.incrementTotalRequests(); // Count manifest requests
+                const url = data && data.url ? data.url : null;
+                this.incrementTotalRequests(url); // Count main playlist requests with URL tracking
                 this.handleManifestLoaded(event, data);
             });
 
             // Track level loading for playlist data
             this.hlsInstance.on(window.Hls.Events.LEVEL_LOADED, (event, data) => {
-                this.incrementTotalRequests(); // Count level requests
+                const url = data && data.url ? data.url : null;
+                this.incrementTotalRequests(url); // Count level playlist requests with URL tracking
                 this.handleLevelLoaded(event, data);
             });
 
-            // Track audio fragment loading
+            // Track audio fragment loading (only if it's actual network request)
             this.hlsInstance.on(window.Hls.Events.AUDIO_TRACK_LOADED, (event, data) => {
-                this.incrementTotalRequests(); // Count audio track requests
+                // Only count if it's a network request for audio playlist
+                if (data && data.url && data.url.includes('.m3u8')) {
+                    this.incrementTotalRequests(data.url);
+                }
                 this.handleAudioTrackLoaded(event, data);
             });
 
-            // Track subtitle loading
+            // Track subtitle loading (only if it's actual network request)
             this.hlsInstance.on(window.Hls.Events.SUBTITLE_TRACK_LOADED, (event, data) => {
-                this.incrementTotalRequests(); // Count subtitle requests
+                // Only count if it's a network request for subtitle playlist
+                if (data && data.url && data.url.includes('.m3u8')) {
+                    this.incrementTotalRequests(data.url);
+                }
                 this.handleSubtitleTrackLoaded(event, data);
             });
 
-            // Track key loading (for encrypted streams)
+            // Don't count key loading as it's not playlist/segment
             this.hlsInstance.on(window.Hls.Events.KEY_LOADED, (event, data) => {
-                this.incrementTotalRequests(); // Count key requests
                 this.handleKeyLoaded(event, data);
             });
 
-            // Track fragment parsing (alternative data source)
+            // Track fragment parsing (alternative data source) - no request counting
             this.hlsInstance.on(window.Hls.Events.FRAG_PARSING_DATA, (event, data) => {
                 this.handleFragmentParsingData(event, data);
             });
-
-            // Network interception disabled to avoid double counting with HLS events
-            // this.setupNetworkInterception();
 
             console.log('HLS data consumption event listeners setup complete');
         } catch (error) {
@@ -435,13 +441,24 @@ export default class DataConsumptionTracker {
     }
 
     /**
-     * Increment total requests counter
+     * Increment total requests counter with URL tracking to avoid duplicates
      */
-    incrementTotalRequests() {
+    incrementTotalRequests(url = null) {
         try {
             if (typeof this.metrics.total_requests !== 'number') {
                 this.metrics.total_requests = 0;
             }
+
+            // If URL is provided, check if we've already counted it
+            if (url) {
+                if (this.trackedUrls.has(url)) {
+                    console.log(`Request already counted: ${url.split('/').pop()}`);
+                    return; // Don't count duplicate
+                }
+                this.trackedUrls.add(url);
+                console.log(`New request counted: ${url.split('/').pop()}`);
+            }
+
             this.metrics.total_requests++;
         } catch (error) {
             console.error('Error incrementing total requests:', error);
@@ -612,6 +629,7 @@ export default class DataConsumptionTracker {
                 const dataStatusElement = dataPanel.querySelector('#dataStatus');
                 const bytesLoadedElement = dataPanel.querySelector('#bytesLoadedValue');
                 const transferRateElement = dataPanel.querySelector('#transferRateValue');
+                const totalRequestsElement = dataPanel.querySelector('#totalRequestsValue');
 
                 if (totalDataElement) {
                     totalDataElement.textContent = this.metrics.total_data_loaded.toFixed(3) + ' GB';
@@ -689,6 +707,11 @@ export default class DataConsumptionTracker {
                     } else {
                         transferRateElement.textContent = 'Measuring...';
                     }
+                }
+
+                if (totalRequestsElement) {
+                    totalRequestsElement.textContent = this.getTotalRequests().toString();
+                    totalRequestsElement.title = `Total playlist (.m3u8) and segment (.ts) requests`;
                 }
             }
         } catch (error) {
@@ -785,6 +808,7 @@ export default class DataConsumptionTracker {
 
             this.lastFragmentTime = null;
             this.lastFragmentBytes = 0;
+            this.trackedUrls = new Set(); // Reset tracked URLs
 
             this.updateDataDisplay();
             console.log('Data consumption metrics reset');
@@ -793,117 +817,7 @@ export default class DataConsumptionTracker {
         }
     }
 
-    /**
-     * Setup network interception to track all HTTP requests
-     */
-    setupNetworkInterception() {
-        try {
-            console.log('Setting up network interception...');
-            // Store original XMLHttpRequest
-            const originalXHR = window.XMLHttpRequest;
-            const self = this;
 
-            // Override XMLHttpRequest to track data consumption
-            window.XMLHttpRequest = function () {
-                const xhr = new originalXHR();
-                const originalOpen = xhr.open;
-                const originalSend = xhr.send;
-
-                let requestUrl = '';
-                let startTime = 0;
-
-                // Override open to capture URL
-                xhr.open = function (method, url, ...args) {
-                    requestUrl = url;
-                    return originalOpen.apply(this, [method, url, ...args]);
-                };
-
-                // Override send to track timing
-                xhr.send = function (...args) {
-                    startTime = performance.now();
-                    console.log(`XHR Request initiated: ${requestUrl}`);
-                    return originalSend.apply(this, args);
-                };
-
-                // Track response data
-                xhr.addEventListener('loadend', function () {
-                    try {
-                        // Count ALL HLS requests regardless of status
-                        if (requestUrl && (requestUrl.includes('.m3u8') || requestUrl.includes('.ts') || requestUrl.includes('.mp4'))) {
-                            self.incrementTotalRequests();
-                            console.log(`Request counted: ${requestUrl.split('/').pop()} - Status: ${xhr.status}`);
-                        }
-
-                        // Only track data for successful requests
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            const responseSize = xhr.response ? xhr.response.byteLength || xhr.responseText?.length || 0 : 0;
-                            const endTime = performance.now();
-                            const loadTime = (endTime - startTime) / 1000; // seconds
-
-                            if (requestUrl && (requestUrl.includes('.m3u8') || requestUrl.includes('.ts') || requestUrl.includes('.mp4'))) {
-                                if (responseSize > 0) {
-                                    self.addDataLoaded(responseSize);
-
-                                    // Calculate transfer rate
-                                    if (loadTime > 0) {
-                                        const transferRateMBps = (responseSize / (1024 * 1024)) / loadTime;
-                                        self.updateTransferRate(transferRateMBps);
-                                    }
-
-                                    console.log(`Network request tracked: ${requestUrl.split('/').pop()} - ${(responseSize / 1024 / 1024).toFixed(2)} MB in ${loadTime.toFixed(2)}s`);
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error tracking network request:', error);
-                    }
-                });
-
-                return xhr;
-            };
-
-            // Also intercept fetch API
-            const originalFetch = window.fetch;
-            window.fetch = function (url, options = {}) {
-                const startTime = performance.now();
-                console.log(`Fetch Request initiated: ${url}`);
-
-                return originalFetch(url, options).then(response => {
-                    try {
-                        if (url.includes('.m3u8') || url.includes('.ts') || url.includes('.mp4')) {
-                            // Increment total requests for all HLS requests
-                            self.incrementTotalRequests();
-
-                            if (response.ok) {
-                                const contentLength = response.headers.get('content-length');
-                                if (contentLength) {
-                                    const responseSize = parseInt(contentLength);
-                                    const endTime = performance.now();
-                                    const loadTime = (endTime - startTime) / 1000;
-
-                                    self.addDataLoaded(responseSize);
-
-                                    if (loadTime > 0) {
-                                        const transferRateMBps = (responseSize / (1024 * 1024)) / loadTime;
-                                        self.updateTransferRate(transferRateMBps);
-                                    }
-
-                                    console.log(`Fetch request tracked: ${url.split('/').pop()} - ${(responseSize / 1024 / 1024).toFixed(2)} MB in ${loadTime.toFixed(2)}s`);
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error tracking fetch request:', error);
-                    }
-                    return response;
-                });
-            };
-
-            console.log('Network interception setup complete');
-        } catch (error) {
-            console.error('Error setting up network interception:', error);
-        }
-    }
 
     /**
      * Test method to simulate data loading (for debugging)
@@ -921,29 +835,15 @@ export default class DataConsumptionTracker {
     }
 
     /**
-     * Reset total requests counter
+     * Reset total requests counter and tracked URLs
      */
     resetTotalRequests() {
         try {
             this.metrics.total_requests = 0;
-            console.log('Total requests counter reset');
+            this.trackedUrls.clear(); // Clear tracked URLs
+            console.log('Total requests counter and tracked URLs reset');
         } catch (error) {
             console.error('Error resetting total requests:', error);
-        }
-    }
-
-    /**
-     * Test method to manually increment requests (for debugging)
-     */
-    testIncrementRequests(count = 5) {
-        try {
-            console.log(`Manually incrementing ${count} requests for testing...`);
-            for (let i = 0; i < count; i++) {
-                this.incrementTotalRequests();
-            }
-            console.log(`Total requests after test: ${this.getTotalRequests()}`);
-        } catch (error) {
-            console.error('Error testing request increment:', error);
         }
     }
 

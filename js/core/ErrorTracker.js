@@ -431,7 +431,7 @@ export default class ErrorTracker {
                             <span class="info-item__value error-none" id="errorCountValue">0</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-item__label">Total Events:</span>
+                            <span class="info-item__label">Total Requests:</span>
                             <span class="info-item__value" id="totalEventsValue">0</span>
                         </div>
                         <div class="info-item">
