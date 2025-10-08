@@ -1193,36 +1193,14 @@ function createMetricsExportPanel() {
                         <span class="info-item__value" id="lastUpdateValue">-</span>
                     </div>
                 </div>
-                <div class="export-controls" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button id="exportJsonBtn" class="btn btn--small" style="padding: 8px 12px; font-size: 12px;">
-                            Export JSON
-                        </button>
-                        <button id="exportCsvBtn" class="btn btn--small" style="padding: 8px 12px; font-size: 12px;">
-                            Export CSV
-                        </button>
-                        <button id="exportXmlBtn" class="btn btn--small" style="padding: 8px 12px; font-size: 12px;">
-                            Export XML
-                        </button>
+                <div class="export-controls x-export">
+                    <div class="x-export__grid">
+                        <button id="exportJsonBtn" class="export-btn">Export JSON</button>
+                        <button id="exportCsvBtn"  class="export-btn">Export CSV</button>
+                        <button id="exportXmlBtn"  class="export-btn">Export XML</button>
+                        <button id="createReportBtn" class="export-btn export-btn--primary">Summary Report</button>
                     </div>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button id="exportServerJsonBtn" class="btn btn--small" style="padding: 8px 12px; font-size: 12px; background: #10b981;">
-                            Server JSON
-                        </button>
-                        <button id="createReportBtn" class="btn btn--small" style="padding: 8px 12px; font-size: 12px; background: #3b82f6;">
-                            Summary Report
-                        </button>
-                        <button id="viewSnapshotBtn" class="btn btn--small" style="padding: 8px 12px; font-size: 12px; background: #8b5cf6;">
-                            View Snapshot
-                        </button>
-                    </div>
-                    <div style="margin-top: 10px;">
-                        <input type="text" id="serverEndpoint" placeholder="Server endpoint URL (optional)" 
-                               style="width: 100%; padding: 8px; background: #334155; color: white; border: 1px solid #475569; border-radius: 3px; margin-bottom: 8px;">
-                        <button id="transmitToServerBtn" class="btn btn--small" style="padding: 8px 12px; font-size: 12px; background: #ef4444; width: 100%;">
-                            Transmit to Server
-                        </button>
-                    </div>
+                </div>
                 </div>
             </div>
         `;
@@ -1247,47 +1225,96 @@ function createMetricsExportPanel() {
  */
 function setupExportPanelEventListeners() {
     try {
-        // Export buttons
-        document.getElementById('exportJsonBtn')?.addEventListener('click', () => {
-            if (metricsDataManager) {
-                metricsDataManager.downloadMetricsFile('json', null, false);
+        // Enhanced export button handler with loading states
+        const handleExportClick = async (button, exportFunction, buttonText) => {
+            if (button.classList.contains('loading')) return;
+
+            // Set loading state
+            button.classList.add('loading');
+            const originalText = button.textContent;
+            button.textContent = 'Exporting...';
+
+            try {
+                await exportFunction();
+
+                // Show success state
+                button.classList.remove('loading');
+                button.classList.add('success');
+                button.textContent = 'Downloaded!';
+
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    button.classList.remove('success');
+                    button.textContent = originalText;
+                }, 2000);
+
+            } catch (error) {
+                console.error('Export failed:', error);
+                button.classList.remove('loading');
+                button.textContent = 'Failed';
+
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
             }
+        };
+
+        // Export JSON button
+        document.getElementById('exportJsonBtn')?.addEventListener('click', (e) => {
+            handleExportClick(e.target, async () => {
+                if (metricsDataManager) {
+                    metricsDataManager.downloadMetricsFile('json', null, false);
+                }
+            }, 'Export JSON');
         });
 
-        document.getElementById('exportCsvBtn')?.addEventListener('click', () => {
-            if (metricsDataManager) {
-                metricsDataManager.downloadMetricsFile('csv', null, false);
-            }
+        // Export CSV button
+        document.getElementById('exportCsvBtn')?.addEventListener('click', (e) => {
+            handleExportClick(e.target, async () => {
+                if (metricsDataManager) {
+                    metricsDataManager.downloadMetricsFile('csv', null, false);
+                }
+            }, 'Export CSV');
         });
 
-        document.getElementById('exportXmlBtn')?.addEventListener('click', () => {
-            if (metricsDataManager) {
-                metricsDataManager.downloadMetricsFile('xml', null, false);
-            }
+        // Export XML button
+        document.getElementById('exportXmlBtn')?.addEventListener('click', (e) => {
+            handleExportClick(e.target, async () => {
+                if (metricsDataManager) {
+                    metricsDataManager.downloadMetricsFile('xml', null, false);
+                }
+            }, 'Export XML');
         });
 
-        document.getElementById('exportServerJsonBtn')?.addEventListener('click', () => {
-            if (metricsDataManager) {
-                metricsDataManager.downloadMetricsFile('json', null, true);
-            }
+        // Server JSON export (if exists)
+        document.getElementById('exportServerJsonBtn')?.addEventListener('click', (e) => {
+            handleExportClick(e.target, async () => {
+                if (metricsDataManager) {
+                    metricsDataManager.downloadMetricsFile('json', null, true);
+                }
+            }, 'Server JSON');
         });
 
-        document.getElementById('createReportBtn')?.addEventListener('click', () => {
-            if (metricsDataManager) {
-                const report = metricsDataManager.createSummaryReport();
-                const reportJson = JSON.stringify(report, null, 2);
+        // Summary Report button
+        document.getElementById('createReportBtn')?.addEventListener('click', (e) => {
+            handleExportClick(e.target, async () => {
+                if (metricsDataManager) {
+                    const report = metricsDataManager.createSummaryReport();
+                    const reportJson = JSON.stringify(report, null, 2);
 
-                // Create and download report
-                const blob = new Blob([reportJson], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `hls-summary-report-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-            }
+                    // Create and download report
+                    const blob = new Blob([reportJson], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `hls-summary-report-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                }
+            }, 'Summary Report');
         });
 
         document.getElementById('viewSnapshotBtn')?.addEventListener('click', () => {

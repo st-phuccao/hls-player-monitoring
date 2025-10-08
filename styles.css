@@ -295,8 +295,11 @@ body {
 
 .btn--primary {
     background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
-    color: var(--text-inverse);
-    box-shadow: var(--shadow-sm);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: var(--font-weight-semibold);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .btn--primary::before {
@@ -312,8 +315,9 @@ body {
 
 .btn--primary:hover {
     background: linear-gradient(135deg, var(--color-primary-dark), #1e40af);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.4);
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .btn--primary:hover::before {
@@ -321,18 +325,68 @@ body {
 }
 
 .btn--primary:active {
-    transform: translateY(0);
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.btn--primary:focus {
+    outline: none;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3), 0 0 0 3px rgba(37, 99, 235, 0.2);
 }
 
 .btn--primary:disabled {
-    background: var(--color-secondary);
+    background: linear-gradient(135deg, var(--color-secondary), #475569);
+    color: #94a3b8;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 .btn--primary:disabled::before {
     display: none;
+}
+
+/* Loading state for Load Stream button */
+.btn--primary.loading {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: #ffffff;
+    pointer-events: none;
+    position: relative;
+}
+
+.btn--primary.loading::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 8px;
+}
+
+/* Success state for Load Stream button */
+.btn--primary.success {
+    background: linear-gradient(135deg, var(--color-success), #059669);
+    color: #ffffff;
+}
+
+.btn--primary.success::after {
+    content: '✓';
+    margin-left: 8px;
+    font-weight: bold;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Video Section */
@@ -947,6 +1001,184 @@ body {
     }
 }
 
+/* Export Controls Styling */
+.export-controls {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-primary);
+}
+
+.x-export__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+}
+
+.export-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    text-decoration: none;
+    border: 1px solid rgba(37, 99, 235, 0.3);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(59, 130, 246, 0.15));
+    color: var(--text-primary);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+    min-height: 40px;
+    backdrop-filter: blur(10px);
+}
+
+.export-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left var(--transition-normal);
+}
+
+.export-btn:hover {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(59, 130, 246, 0.25));
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.25);
+    color: var(--text-primary);
+}
+
+.export-btn:hover::before {
+    left: 100%;
+}
+
+.export-btn:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-sm);
+}
+
+.export-btn:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+/* Primary export button (Summary Report) */
+.export-btn--primary {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: var(--text-inverse);
+    border-color: var(--color-primary);
+    font-weight: var(--font-weight-semibold);
+}
+
+.export-btn--primary::before {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+}
+
+.export-btn--primary:hover {
+    background: linear-gradient(135deg, var(--color-primary-dark), #1e40af);
+    border-color: var(--color-primary-dark);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3);
+}
+
+.export-btn--primary:focus {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+}
+
+/* Add icons to export buttons */
+.export-btn::after {
+    content: '';
+    width: 16px;
+    height: 16px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    opacity: 0.8;
+    transition: opacity var(--transition-fast);
+}
+
+.export-btn:hover::after {
+    opacity: 1;
+}
+
+/* Responsive export buttons */
+@media (max-width: 768px) {
+    .x-export__grid {
+        grid-template-columns: 1fr 1fr;
+        gap: var(--spacing-xs);
+    }
+
+    .export-btn {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        font-size: var(--font-size-xs);
+        min-height: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+    .x-export__grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-xs);
+    }
+
+    .export-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Loading state for export buttons */
+.export-btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.export-btn.loading::after {
+    content: '';
+    width: 16px;
+    height: 16px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    background: none;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Success state animation */
+.export-btn.success {
+    background: linear-gradient(135deg, var(--color-success), #059669);
+    border-color: var(--color-success);
+    color: white;
+}
+
+.export-btn.success::after {
+    content: '✓';
+    width: auto;
+    height: auto;
+    background: none;
+    color: white;
+    font-weight: var(--font-weight-bold);
+}
+
 /* Accessibility Enhancements */
 @media (prefers-reduced-motion: reduce) {
 
@@ -956,6 +1188,14 @@ body {
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
+    }
+
+    .export-btn::before {
+        display: none;
+    }
+
+    .export-btn:hover {
+        transform: none;
     }
 }
 
@@ -2803,29 +3043,6 @@ Metrics Styles */
     }
 }
 
-
-
-
-
-
-
-0%,
-100% {
-    opacity: 1;
-    transform: scale(1);
-}
-
-33% {
-    opacity: 0.9;
-    transform: scale(1.01);
-}
-
-66% {
-    opacity: 0.95;
-    transform: scale(1.005);
-}
-}
-
 /* Animation for buffering status */
 @keyframes playbackBuffering {
 
@@ -3431,4 +3648,191 @@ Enhanced Responsive Design and Visual Enhancements for Professional Dashboard */
 
 .professional-dashboard.loading .metric-card {
     animation: shimmer 1.5s infinite;
+}
+
+/* ------- Scoped container ------- */
+.x-export {
+    margin-top: 12px;
+}
+
+.x-export .x-export__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+/* ------- Button base ------- */
+.x-export .export-btn {
+    position: relative;
+    min-width: 0;
+    width: 100%;
+    height: 42px;
+    padding: 0 16px;
+    box-sizing: border-box;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .2px;
+
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, .06);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0))
+        /* sheen */
+        ,
+        linear-gradient(180deg, rgba(37, 99, 235, 0.12) 0%, rgba(59, 130, 246, 0.18) 100%);
+    color: #e9eef9;
+
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .05) inset,
+        0 8px 18px rgba(0, 0, 0, .35),
+        0 1px 0 rgba(0, 0, 0, .7);
+
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+
+    transition:
+        transform .14s cubic-bezier(.2, .7, .2, 1),
+        box-shadow .18s ease,
+        background .18s ease,
+        border-color .18s ease,
+        color .18s ease;
+}
+
+/* sheen highlight on hover */
+.x-export .export-btn::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(200% 60% at 50% -20%,
+            rgba(255, 255, 255, .18), transparent 60%);
+    opacity: 0;
+    transition: opacity .25s ease;
+}
+
+/* Hover: nâng nhẹ + sáng hơn */
+.x-export .export-btn:hover {
+    transform: translateY(-1px);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .06) inset,
+        0 12px 26px rgba(0, 0, 0, .45),
+        0 2px 0 rgba(0, 0, 0, .7);
+    border-color: rgba(255, 255, 255, .12);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, #252c3b 0%, #161c27 100%);
+}
+
+.x-export .export-btn:hover::after {
+    opacity: 1;
+}
+
+/* Active: nhấn xuống + ripple nhẹ */
+.x-export .export-btn:active {
+    transform: translateY(0) scale(.98);
+    box-shadow:
+        0 0 0 rgba(255, 255, 255, 0) inset,
+        0 6px 14px rgba(0, 0, 0, .4);
+}
+
+/* Focus ring rõ ràng, không phá layout */
+.x-export .export-btn:focus-visible {
+    outline: 2px solid #60a5fa;
+    outline-offset: 2px;
+}
+
+/* Specific button colors */
+#exportJsonBtn {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.25) 100%);
+    border-color: rgba(245, 158, 11, .4);
+}
+
+#exportJsonBtn:hover {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, rgba(245, 158, 11, 0.3) 0%, rgba(251, 191, 36, 0.35) 100%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .06) inset,
+        0 14px 28px rgba(245, 158, 11, .35);
+}
+
+#exportCsvBtn {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, rgba(16, 185, 129, 0.2) 0%, rgba(34, 197, 94, 0.25) 100%);
+    border-color: rgba(16, 185, 129, .4);
+}
+
+#exportCsvBtn:hover {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, rgba(16, 185, 129, 0.3) 0%, rgba(34, 197, 94, 0.35) 100%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .06) inset,
+        0 14px 28px rgba(16, 185, 129, .35);
+}
+
+#exportXmlBtn {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, rgba(168, 85, 247, 0.2) 0%, rgba(196, 181, 253, 0.25) 100%);
+    border-color: rgba(168, 85, 247, .4);
+}
+
+#exportXmlBtn:hover {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .12), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, rgba(168, 85, 247, 0.3) 0%, rgba(196, 181, 253, 0.35) 100%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .06) inset,
+        0 14px 28px rgba(168, 85, 247, .35);
+}
+
+/* Primary/CTA */
+.x-export .export-btn--primary {
+    border-color: rgba(59, 130, 246, .55);
+    color: #fff;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .15), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, #3b82f6 0%, #2f6fe6 100%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .05) inset,
+        0 10px 22px rgba(59, 130, 246, .35),
+        0 1px 0 rgba(0, 0, 0, .5);
+}
+
+.x-export .export-btn--primary:hover {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, .18), rgba(255, 255, 255, 0)),
+        linear-gradient(180deg, #4087fb 0%, #2966dc 100%);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, .06) inset,
+        0 14px 28px rgba(59, 130, 246, .45);
+}
+
+/* Disabled state (nếu cần) */
+.x-export .export-btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .x-export .export-btn {
+        transition: none;
+    }
+
+    .x-export .export-btn:hover {
+        transform: none;
+    }
 }
