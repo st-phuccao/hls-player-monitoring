@@ -451,39 +451,12 @@ function initializeMetricsDataManager() {
                     return metricsDataManager ? metricsDataManager.createSummaryReport() : {};
                 };
 
-                // Debug methods for rebuffer tracking
-                window.debugRebufferStatus = function () {
-                    if (performanceTracker) {
-                        const config = performanceTracker.getRebufferConfig();
-                        const metrics = performanceTracker.getRebufferMetrics();
-                        console.log('Rebuffer Debug Status:', {
-                            config,
-                            metrics,
-                            videoElement: !!videoElement,
-                            videoPaused: videoElement?.paused,
-                            videoReadyState: videoElement?.readyState
-                        });
-                        return { config, metrics };
-                    }
-                    return null;
-                };
-
                 window.forcePlayingEvent = function () {
                     if (performanceTracker) {
                         performanceTracker.triggerPlayingEvent();
                         performanceTracker.forceUpdateDisplay();
                         console.log('Forced playing event and display update');
                     }
-                };
-
-                // Debug methods for data consumption tracking
-                window.debugDataConsumption = function () {
-                    if (dataConsumptionTracker) {
-                        const debugInfo = dataConsumptionTracker.getDebugInfo();
-                        console.log('Data Consumption Debug Info:', debugInfo);
-                        return debugInfo;
-                    }
-                    return null;
                 };
 
                 window.simulateDataLoading = function () {
@@ -531,6 +504,24 @@ function initializeMetricsDataManager() {
                 window.hlsPlayer = hlsPlayer;
                 window.videoElement = videoElement;
                 window.performanceTracker = performanceTracker;
+
+                // Debug method for testing segment performance chart
+                window.testSegmentChart = function () {
+                    if (streamAnalytics && streamAnalytics.chartManager) {
+                        console.log('Testing segment performance chart with sample data...');
+
+                        // Add some sample data
+                        for (let i = 1; i <= 5; i++) {
+                            const duration = 10 + Math.random() * 2; // 10-12 seconds
+                            const loadTime = 50 + Math.random() * 100; // 50-150ms
+                            streamAnalytics.chartManager.updateSegmentPerformanceChart(duration, loadTime);
+                        }
+
+                        console.log('Sample data added to segment performance chart');
+                    } else {
+                        console.log('Chart manager not available');
+                    }
+                };
 
                 // Debug methods for bitrate tracking
                 window.debugBitrateTracking = function () {
@@ -4839,10 +4830,6 @@ class Dashboard {
                 const performanceStats = streamAnalytics.getPerformanceStats();
                 const streamCard = document.querySelector('.card:has(#streamInfo)');
 
-                // Debug logs (commented out to reduce console spam)
-                // console.log('Stream metrics:', metrics);
-                // Stream Performance elements removed
-
                 // Mark card as updating
                 if (streamCard) streamCard.classList.add('card--updating');
 
@@ -4942,6 +4929,26 @@ class Dashboard {
 
             // Update FPS chart
             this.chartManager.updateFPSChart(currentFPS);
+
+            // Get segment performance data from PerformanceTracker
+            if (window.performanceTracker && window.performanceTracker.metrics.segments) {
+                const segmentMetrics = window.performanceTracker.metrics.segments;
+                const durations = segmentMetrics.segment_durations || [];
+                const loadTimes = segmentMetrics.segment_load_times || [];
+
+                // Only update if we have new data (check if arrays have data)
+                if (durations.length > 0 && loadTimes.length > 0) {
+                    // Get the latest segment data
+                    const latestDuration = durations[durations.length - 1];
+                    const latestLoadTime = loadTimes[loadTimes.length - 1];
+
+                    // Check if this is new data (not already in chart)
+                    const currentChartLength = this.chartManager.chartData.segmentPerformance.durations.length;
+                    if (durations.length > currentChartLength) {
+                        this.chartManager.updateSegmentPerformanceChart(latestDuration, latestLoadTime);
+                    }
+                }
+            }
         } catch (error) {
             console.error('Error updating charts:', error);
         }
@@ -5237,6 +5244,12 @@ class ChartManager {
                 data: [],
                 maxDataPoints: 30
             },
+            segmentPerformance: {
+                labels: [],
+                durations: [],
+                loadTimes: [],
+                maxDataPoints: 20
+            },
             bufferHealth: {
                 value: 0
             }
@@ -5258,6 +5271,7 @@ class ChartManager {
         try {
             this.createNetworkChart();
             this.createFPSChart();
+            this.createSegmentPerformanceChart();
             this.isInitialized = true;
             console.log('Charts initialized successfully');
         } catch (error) {
@@ -5532,6 +5546,190 @@ class ChartManager {
     }
 
     /**
+     * Create segment performance chart (durations and load times)
+     */
+    createSegmentPerformanceChart() {
+        const canvas = document.getElementById('segmentPerformanceChart');
+        if (!canvas) {
+            console.warn('Segment performance chart canvas not found');
+            return;
+        }
+
+        const ctx = canvas.getContext('2d');
+
+        this.charts.segmentPerformance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: this.chartData.segmentPerformance.labels,
+                datasets: [
+                    {
+                        label: 'Segment Duration (s)',
+                        data: this.chartData.segmentPerformance.durations,
+                        borderColor: 'rgb(239, 68, 68)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: 'rgb(239, 68, 68)',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Load Time (ms)',
+                        data: this.chartData.segmentPerformance.loadTimes,
+                        borderColor: 'rgb(168, 85, 247)',
+                        backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 5,
+                        pointBackgroundColor: 'rgb(168, 85, 247)',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 750,
+                    easing: 'easeInOutQuart'
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            color: '#f8fafc',
+                            font: {
+                                size: 12,
+                                weight: '500'
+                            },
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: '#334155',
+                        borderWidth: 1,
+                        cornerRadius: 8,
+                        displayColors: true,
+                        callbacks: {
+                            title: function (context) {
+                                return `Segment #${context[0].label}`;
+                            },
+                            label: function (context) {
+                                const label = context.dataset.label;
+                                const value = context.parsed.y;
+                                if (label.includes('Duration')) {
+                                    return `${label}: ${value.toFixed(2)}s`;
+                                } else {
+                                    return `${label}: ${value.toFixed(1)}ms`;
+                                }
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Segment Number (Last 20)',
+                            color: '#94a3b8',
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            }
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 10
+                            },
+                            maxTicksLimit: 10
+                        },
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)',
+                            drawBorder: false
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Duration (seconds)',
+                            color: 'rgb(239, 68, 68)',
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            }
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 10
+                            },
+                            callback: function (value) {
+                                return value.toFixed(1) + 's';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(51, 65, 85, 0.3)',
+                            drawBorder: false
+                        },
+                        beginAtZero: true
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Load Time (ms)',
+                            color: 'rgb(168, 85, 247)',
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            }
+                        },
+                        ticks: {
+                            color: '#64748b',
+                            font: {
+                                size: 10
+                            },
+                            callback: function (value) {
+                                return value.toFixed(0) + 'ms';
+                            }
+                        },
+                        grid: {
+                            drawOnChartArea: false,
+                            drawBorder: false
+                        },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    /**
      * Update network chart with new data
      */
     updateNetworkChart(bandwidthMbps) {
@@ -5592,6 +5790,35 @@ class ChartManager {
     }
 
     /**
+     * Update segment performance chart with new data
+     */
+    updateSegmentPerformanceChart(segmentDuration, loadTime) {
+        if (!this.charts.segmentPerformance || !this.isInitialized || typeof Chart === 'undefined') return;
+
+        // Generate segment number label
+        const segmentNumber = this.chartData.segmentPerformance.labels.length + 1;
+
+        // Add new data points
+        this.chartData.segmentPerformance.labels.push(segmentNumber);
+        this.chartData.segmentPerformance.durations.push(segmentDuration || 0);
+        this.chartData.segmentPerformance.loadTimes.push(loadTime || 0);
+
+        // Remove old data points if we exceed max (keep last 20)
+        if (this.chartData.segmentPerformance.labels.length > this.chartData.segmentPerformance.maxDataPoints) {
+            this.chartData.segmentPerformance.labels.shift();
+            this.chartData.segmentPerformance.durations.shift();
+            this.chartData.segmentPerformance.loadTimes.shift();
+        }
+
+        // Update chart
+        this.charts.segmentPerformance.data.labels = this.chartData.segmentPerformance.labels;
+        this.charts.segmentPerformance.data.datasets[0].data = this.chartData.segmentPerformance.durations;
+        this.charts.segmentPerformance.data.datasets[1].data = this.chartData.segmentPerformance.loadTimes;
+
+        this.charts.segmentPerformance.update('none'); // No animation for real-time updates
+    }
+
+    /**
      * Reset all charts
      */
     resetCharts() {
@@ -5600,6 +5827,9 @@ class ChartManager {
         this.chartData.bandwidth.data = [];
         this.chartData.fps.labels = [];
         this.chartData.fps.data = [];
+        this.chartData.segmentPerformance.labels = [];
+        this.chartData.segmentPerformance.durations = [];
+        this.chartData.segmentPerformance.loadTimes = [];
 
         // Update charts
         if (this.charts.network) {
@@ -5612,6 +5842,13 @@ class ChartManager {
             this.charts.fps.data.labels = [];
             this.charts.fps.data.datasets[0].data = [];
             this.charts.fps.update();
+        }
+
+        if (this.charts.segmentPerformance) {
+            this.charts.segmentPerformance.data.labels = [];
+            this.charts.segmentPerformance.data.datasets[0].data = [];
+            this.charts.segmentPerformance.data.datasets[1].data = [];
+            this.charts.segmentPerformance.update();
         }
 
         console.log('Charts reset');
