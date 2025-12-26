@@ -40,6 +40,8 @@ HLS Stream Monitor is a professional web application designed for monitoring, an
 
 ![Chart](./images/charts.png)
 
+![Chart](./images/segment-performance.png)
+
 ## 🛠️ System Requirements
 
 ### Supported Browsers
